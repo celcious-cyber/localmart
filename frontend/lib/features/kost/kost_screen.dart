@@ -59,7 +59,7 @@ class KostScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -99,7 +99,7 @@ class KostScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.05),
+              color: AppColors.primary.withOpacity(0.05),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -135,7 +135,7 @@ class KostScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withValues(alpha: 0.2)),
+                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.2)),
               ),
               child: Center(
                 child: Text(
@@ -185,7 +185,7 @@ class KostScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),

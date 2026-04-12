@@ -230,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -471,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   'Belanja kebutuhan harian pertamamu',
                   style: GoogleFonts.manrope(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withOpacity(0.9),
                     fontSize: 12,
                   ),
                 ),
@@ -582,7 +582,7 @@ class _HomeScreenState extends State<HomeScreen>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF006A67).withValues(alpha: 0.08),
+                    color: const Color(0xFF006A67).withOpacity(0.08),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -725,7 +725,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               Positioned.fill(
                 child: CustomPaint(
                   painter: WavyPatternPainter(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withOpacity(0.15),
                   ),
                 ),
               ),
@@ -743,7 +743,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
+                            color: Colors.white.withOpacity(0.3),
                             width: 2,
                           ),
                           image: const DecorationImage(
@@ -764,7 +764,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                               style: GoogleFonts.manrope(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                                 letterSpacing: 1.2,
                               ),
                             ),
@@ -803,7 +803,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                     'Saldo Tersedia',
                     style: GoogleFonts.manrope(
                       fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withOpacity(0.8),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -871,7 +871,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF006A67).withValues(alpha: 0.15),
+                    color: const Color(0xFF006A67).withOpacity(0.15),
                     blurRadius: 40,
                     offset: const Offset(0, 15),
                   ),
@@ -940,7 +940,7 @@ class BNBCustomPainter extends CustomPainter {
     path.close();
 
     // Premium Shadow - Optimized elevation for performance
-    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.2), 8, false);
+    canvas.drawShadow(path, Colors.black.withOpacity(0.2), 8, false);
     canvas.drawPath(path, paint);
   }
 

@@ -59,7 +59,7 @@ class LocalSendScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -110,7 +110,7 @@ class LocalSendScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppColors.primary.withOpacity(0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -138,7 +138,7 @@ class LocalSendScreen extends StatelessWidget {
                     style: GoogleFonts.manrope(
                       fontSize: 10,
                       color: isSelected
-                          ? Colors.white.withValues(alpha: 0.8)
+                          ? Colors.white.withOpacity(0.8)
                           : Colors.grey,
                     ),
                   ),
@@ -229,7 +229,7 @@ class LocalSendScreen extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.local_post_office_outlined, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
@@ -244,7 +244,7 @@ class LocalSendScreen extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                 child: Text(item['status']!, style: GoogleFonts.manrope(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primary)),
               ),
             ],

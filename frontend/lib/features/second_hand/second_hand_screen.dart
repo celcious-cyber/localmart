@@ -67,7 +67,7 @@ class SecondHandScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -114,7 +114,7 @@ class SecondHandScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.05),
+              color: AppColors.primary.withOpacity(0.05),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -159,7 +159,7 @@ class SecondHandScreen extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primary
-                      : Colors.grey.withValues(alpha: 0.1),
+                      : Colors.grey.withOpacity(0.1),
                 ),
               ),
               child: Center(
@@ -241,7 +241,7 @@ class SecondHandScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.05),
+                  color: AppColors.primary.withOpacity(0.05),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),

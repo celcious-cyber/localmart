@@ -59,7 +59,7 @@ class LocalPayScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -96,12 +96,12 @@ class LocalPayScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: Colors.white.withOpacity(0.9),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.15),
+              color: AppColors.primary.withOpacity(0.15),
               blurRadius: 30,
               offset: const Offset(0, 15),
             ),
@@ -122,7 +122,7 @@ class LocalPayScreen extends StatelessWidget {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                   child: Text('Premium', style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
                 ),
               ],
@@ -149,7 +149,7 @@ class LocalPayScreen extends StatelessWidget {
         Container(
           width: 50,
           height: 50,
-          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
           child: Icon(icon, color: AppColors.primary, size: 24),
         ),
         const SizedBox(height: 8),
@@ -225,7 +225,7 @@ class LocalPayScreen extends StatelessWidget {
               Container(
                 width: 45,
                 height: 45,
-                decoration: BoxDecoration(color: (isIn ? Colors.green : Colors.red).withValues(alpha: 0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: (isIn ? Colors.green : Colors.red).withOpacity(0.1), shape: BoxShape.circle),
                 child: Icon(isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIn ? Colors.green : Colors.red, size: 20),
               ),
               const SizedBox(width: 15),

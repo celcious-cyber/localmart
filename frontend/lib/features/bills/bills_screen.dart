@@ -59,7 +59,7 @@ class BillsScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -99,7 +99,7 @@ class BillsScreen extends StatelessWidget {
           color: AppColors.primary,
           borderRadius: BorderRadius.circular(24),
           gradient: LinearGradient(
-            colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+            colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -117,7 +117,7 @@ class BillsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Diskon hingga Rp 25.000 untuk pembayaran pertama PDAM.',
-                    style: GoogleFonts.manrope(fontSize: 12, color: Colors.white.withValues(alpha: 0.8)),
+                    style: GoogleFonts.manrope(fontSize: 12, color: Colors.white.withOpacity(0.8)),
                   ),
                 ],
               ),
@@ -165,7 +165,7 @@ class BillsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: (s['color'] as Color).withValues(alpha: 0.1),
+                      color: (s['color'] as Color).withOpacity(0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -222,7 +222,7 @@ class BillsScreen extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.receipt_rounded, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),

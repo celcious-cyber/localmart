@@ -180,7 +180,7 @@ class ChatScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.9),
+                color: AppColors.primary.withOpacity(0.9),
                 shape: BoxShape.circle,
               ),
               child: Text(
