@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalMart | Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="dashboard-page">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h2>LocalMart</h2>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item">
+                <a href="#" class="nav-link active" data-target="overview">
+                    <i class="material-icons">dashboard</i> Overview
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="banners">
+                    <i class="material-icons">view_carousel</i> Banners
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="categories">
+                    <i class="material-icons">category</i> Categories
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="products">
+                    <i class="material-icons">shopping_bag</i> Products
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="stores">
+                    <i class="material-icons">store</i> Stores
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="drivers">
+                    <i class="material-icons">local_shipping</i> Drivers
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-target="sections">
+                    <i class="material-icons">settings_overscan</i> UI Sections
+                </a>
+            </li>
+        </ul>
+        <div style="position: absolute; bottom: 2rem; width: 100%; left: 0; padding: 0 1rem;">
+            <button id="logoutBtn" class="btn-secondary">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="top-bar">
+            <h1 id="sectionTitle">Dashboard Overview</h1>
+            <div class="user-info">
+                Welcome, <strong id="adminName">Admin</strong>
+            </div>
+        </header>
+
+        <!-- Overview Section -->
+        <section id="overview" class="cms-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Active Banners</h3>
+                    <div class="value" id="bannerCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Categories</h3>
+                    <div class="value" id="categoryCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Products</h3>
+                    <div class="value" id="productCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Mitra Toko</h3>
+                    <div class="value" id="storeCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Mitra Driver</h3>
+                    <div class="value" id="driverCount">0</div>
+                </div>
+            </div>
+            
+            <div class="section-card">
+                <h3>Sistem CMS LocalMart</h3>
+                <p style="margin-top: 1rem; color: var(--text-muted);">
+                    Gunakan menu di samping untuk mengelola konten yang tampil pada aplikasi mobile LocalMart. 
+                    Setiap perubahan yang Anda buat di sini akan langsung berdampak pada tampilan pengguna akhir.
+                </p>
+            </div>
+        </section>
+
+        <!-- Banners Section -->
+        <section id="banners" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Banner Management</h3>
+                    <button class="action-btn" onclick="openBannerModal()">+ Add Banner</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Preview</th>
+                            <th>Title</th>
+                            <th>Position</th>
+                            <th>Order</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bannerList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Categories Section -->
+        <section id="categories" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Category Management</h3>
+                    <button class="action-btn" onclick="openCategoryModal()">+ Add Category</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Icon</th>
+                            <th>Name</th>
+                            <th>Slug</th>
+                            <th>Order</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoryList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Products Section -->
+        <section id="products" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Product Management</h3>
+                    <button class="action-btn" onclick="openProductModal()">+ Add Product</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- UI Sections Manager -->
+        <section id="sections" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Homepage Sections</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Section Name</th>
+                            <th>Key</th>
+                            <th>Order</th>
+                            <th>Visible</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="homeSectionList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Stores Section -->
+        <section id="stores" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Store Management</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Store Name</th>
+                            <th>Owner</th>
+                            <th>Category</th>
+                            <th>Joined At</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="storeList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Drivers Section -->
+        <section id="drivers" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Driver Management</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Driver Name</th>
+                            <th>Plate Number</th>
+                            <th>Vehicle</th>
+                            <th>Phone</th>
+                            <th>Balance</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driverList"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals (Simplified versions) -->
+    <div id="bannerModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalTitle">Banner Editor</h3>
+            <form id="bannerForm" style="margin-top: 1.5rem;">
+                <input type="hidden" id="bannerId">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="b_title" required>
+                </div>
+                <div class="form-group">
+                    <label>Image URL</label>
+                    <input type="text" id="b_image_url" placeholder="/uploads/..." required>
+                    <input type="file" id="b_file" style="margin-top: 0.5rem;" onchange="uploadImage('b_file', 'b_preview', 'b_image_url')">
+                    <img id="b_preview" class="preview-img" src="">
+                </div>
+                <div class="form-group">
+                    <label>Position</label>
+                    <select id="b_position" style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <option value="top">Top Highlight</option>
+                        <option value="slider">Bottom Slider</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Sort Order</label>
+                    <input type="number" id="b_order" value="0">
+                </div>
+                <div class="btn-group">
+                    <button type="submit">Save Changes</button>
+                    <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content">
+            <h3>Category Editor</h3>
+            <form id="categoryForm" style="margin-top: 1.5rem;">
+                <input type="hidden" id="categoryId">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="c_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Slug</label>
+                    <input type="text" id="c_slug" required>
+                </div>
+                <div class="form-group">
+                    <label>Icon Name (Material Icons)</label>
+                    <input type="text" id="c_icon_name" placeholder="shopping_cart" required>
+                </div>
+                <div class="form-group">
+                    <label>Sort Order</label>
+                    <input type="number" id="c_order" value="0">
+                </div>
+                <div class="btn-group">
+                    <button type="submit">Save Changes</button>
+                    <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <h3>Product Editor</h3>
+            <form id="productForm" style="margin-top: 1.5rem;">
+                <input type="hidden" id="productId">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="p_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Category ID</label>
+                    <input type="number" id="p_cat_id" required>
+                </div>
+                <div class="form-group">
+                    <label>Price</label>
+                    <input type="number" id="p_price" required>
+                </div>
+                <div class="form-group">
+                    <label>Image URL</label>
+                    <input type="text" id="p_image_url" placeholder="/uploads/..." required>
+                    <input type="file" id="p_file" style="margin-top: 0.5rem;" onchange="uploadImage('p_file', 'p_preview', 'p_image_url')">
+                    <img id="p_preview" class="preview-img" src="">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="p_desc" style="width: 100%; height: 80px; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.8rem;"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button type="submit">Save Changes</button>
+                    <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script>
+        // Check Auth
+        if (!localStorage.getItem('admin_token')) {
+            window.location.href = 'index.html';
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        }
+
+        // --- Modals Opener ---
+        function openBannerModal(data = null) {
+            const modal = document.getElementById('bannerModal');
+            document.getElementById('bannerForm').reset();
+            document.getElementById('b_preview').src = '';
+            if (data) {
+                document.getElementById('bannerId').value = data.id;
+                document.getElementById('b_title').value = data.title;
+                document.getElementById('b_image_url').value = data.image_url;
+                document.getElementById('b_preview').src = data.image_url;
+                document.getElementById('b_position').value = data.position;
+                document.getElementById('b_order').value = data.sort_order;
+            } else { document.getElementById('bannerId').value = ''; }
+            modal.style.display = 'flex';
+        }
+
+        function openCategoryModal(data = null) {
+            const modal = document.getElementById('categoryModal');
+            document.getElementById('categoryForm').reset();
+            if (data) {
+                document.getElementById('categoryId').value = data.id;
+                document.getElementById('c_name').value = data.name;
+                document.getElementById('c_slug').value = data.slug;
+                document.getElementById('c_icon_name').value = data.icon_name;
+                document.getElementById('c_order').value = data.sort_order;
+            } else { document.getElementById('categoryId').value = ''; }
+            modal.style.display = 'flex';
+        }
+
+        function openProductModal(data = null) {
+            const modal = document.getElementById('productModal');
+            document.getElementById('productForm').reset();
+            document.getElementById('p_preview').src = '';
+            if (data) {
+                document.getElementById('productId').value = data.id;
+                document.getElementById('p_name').value = data.name;
+                document.getElementById('p_cat_id').value = data.category_id;
+                document.getElementById('p_price').value = data.price;
+                document.getElementById('p_image_url').value = data.image_url;
+                document.getElementById('p_preview').src = data.image_url;
+                document.getElementById('p_desc').value = data.description;
+            } else { document.getElementById('productId').value = ''; }
+            modal.style.display = 'flex';
+        }
+
+        // --- Forms Submission ---
+        document.getElementById('bannerForm').onsubmit = (e) => submitForm(e, 'bannerId', 'banners', {
+            title: document.getElementById('b_title').value,
+            image_url: document.getElementById('b_image_url').value,
+            position: document.getElementById('b_position').value,
+            sort_order: parseInt(document.getElementById('b_order').value),
+            is_active: true
+        });
+
+        document.getElementById('categoryForm').onsubmit = (e) => submitForm(e, 'categoryId', 'categories', {
+            name: document.getElementById('c_name').value,
+            slug: document.getElementById('c_slug').value,
+            icon_name: document.getElementById('c_icon_name').value,
+            sort_order: parseInt(document.getElementById('c_order').value),
+            is_active: true
+        });
+
+        document.getElementById('productForm').onsubmit = (e) => submitForm(e, 'productId', 'products', {
+            name: document.getElementById('p_name').value,
+            category_id: parseInt(document.getElementById('p_cat_id').value),
+            price: parseFloat(document.getElementById('p_price').value),
+            image_url: document.getElementById('p_image_url').value,
+            description: document.getElementById('p_desc').value,
+            is_active: true
+        });
+
+        async function submitForm(e, idField, type, payload) {
+            e.preventDefault();
+            const id = document.getElementById(idField).value;
+            const url = id ? `${API_URL}/admin/${type}/${id}` : `${API_URL}/admin/${type}`;
+            const method = id ? 'PUT' : 'POST';
+            try {
+                await handleResponse(await fetch(url, {
+                    method, headers: getHeaders(), body: JSON.stringify(payload)
+                }));
+                location.reload();
+            } catch (err) { alert(err.message); }
+        }
+    </script>
+</body>
+</html>

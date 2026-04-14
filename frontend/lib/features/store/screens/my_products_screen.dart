@@ -1,38 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/services/api_service.dart';
+import '../../../shared/models/home_data.dart';
+import 'add_product_screen.dart';
 
-class MyProductsScreen extends StatelessWidget {
+class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> products = [
-      {
-        'name': 'Kopi Tepal Original 250g',
-        'price': 'Rp 45.000',
-        'stock': 15,
-        'sold': 42,
-        'image': 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?q=80&w=200&auto=format&fit=crop',
-        'status': 'Aktif',
-      },
-      {
-        'name': 'Madu Hutan KSB 500ml',
-        'price': 'Rp 120.000',
-        'stock': 5,
-        'sold': 10,
-        'image': 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?q=80&w=200&auto=format&fit=crop',
-        'status': 'Stok Rendah',
-      },
-      {
-        'name': 'Kripik Pisang Manis',
-        'price': 'Rp 15.000',
-        'stock': 50,
-        'sold': 120,
-        'image': 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?q=80&w=200&auto=format&fit=crop',
-        'status': 'Aktif',
-      },
-    ];
+  State<MyProductsScreen> createState() => _MyProductsScreenState();
+}
 
+class _MyProductsScreenState extends State<MyProductsScreen> {
+  List<ProductModel> _products = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() => _isLoading = true);
+    final products = await ApiService().getStoreProducts();
+    if (mounted) {
+      setState(() {
+        _products = products;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -44,17 +45,39 @@ class MyProductsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0.5,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadProducts,
+          ),
+        ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final product = products[index];
-          return _buildProductCard(product);
-        },
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          : _products.isEmpty
+              ? _buildEmptyState()
+              : RefreshIndicator(
+                  onRefresh: _loadProducts,
+                  color: Colors.orange,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: _products.length,
+                    itemBuilder: (context, index) {
+                      final product = _products[index];
+                      return _buildProductCard(product);
+                    },
+                  ),
+                ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddProductScreen()),
+          );
+          if (result == true) {
+            _loadProducts(); // Refresh list if added
+          }
+        },
         backgroundColor: Colors.orange,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text('Tambah Produk', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
@@ -62,8 +85,28 @@ class MyProductsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(Map<String, dynamic> product) {
-    bool isLowStock = product['stock'] <= 5;
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada produk',
+            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey[600]),
+          ),
+          Text(
+            'Mulai tambahkan produk jualan Anda!',
+            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[400]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductCard(ProductModel product) {
+    bool isLowStock = product.stock <= 5;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
@@ -71,7 +114,7 @@ class MyProductsScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Row(
@@ -79,10 +122,16 @@ class MyProductsScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(15),
             child: Image.network(
-              product['image'],
+              '${ApiService().getImageUrl(product.imageUrl)}${ApiService().getImageUrl(product.imageUrl).contains('?') ? '&' : '?'}t=${DateTime.now().millisecondsSinceEpoch}',
               width: 80,
               height: 80,
               fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 80,
+                height: 80,
+                color: Colors.grey[100],
+                child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -91,29 +140,78 @@ class MyProductsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product['name'],
+                  product.name,
                   style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  product['price'],
+                  'Rp ${product.price.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
                   style: GoogleFonts.poppins(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildBadge('Stok: ${product['stock']}', isLowStock ? Colors.red : Colors.grey[600]!),
+                    _buildBadge('Stok: ${product.stock}', isLowStock ? Colors.red : Colors.grey[600]!),
                     const SizedBox(width: 8),
-                    _buildBadge('Terjual: ${product['sold']}', Colors.blue),
+                    _buildBadge('Terjual: ${product.sold}', Colors.blue),
                   ],
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey),
-            onPressed: () {},
+            icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddProductScreen(product: product),
+                ),
+              );
+              if (result == true) {
+                _loadProducts();
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red),
+            onPressed: () => _confirmDelete(product),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(ProductModel product) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Hapus Produk?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        content: Text('Anda yakin ingin menghapus "${product.name}"? Tindakan ini tidak dapat dibatalkan.', style: GoogleFonts.poppins()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              setState(() => _isLoading = true);
+              final result = await ApiService().deleteStoreProduct(product.id);
+              if (mounted) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['message']),
+                      backgroundColor: result['success'] ? Colors.green : Colors.red,
+                    ),
+                  );
+                }
+                _loadProducts();
+              }
+            },
+            child: Text('Hapus', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -124,7 +222,7 @@ class MyProductsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(

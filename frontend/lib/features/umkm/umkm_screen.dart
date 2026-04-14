@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../auth/widgets/auth_utils.dart';
 
 class UMKMScreen extends StatelessWidget {
   const UMKMScreen({super.key});
@@ -32,7 +33,8 @@ class UMKMScreen extends StatelessWidget {
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 100,
+      expandedHeight: 130,
+      toolbarHeight: 70,
       elevation: 0,
       backgroundColor: AppColors.primary,
       automaticallyImplyLeading: false,
@@ -67,7 +69,7 @@ class UMKMScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -82,7 +84,12 @@ class UMKMScreen extends StatelessWidget {
       ),
       actions: [
         IconButton(
-          onPressed: () {},
+          onPressed: () {
+            AuthUtils.showLoginRequirement(
+              context,
+              message: 'Silakan masuk untuk melihat keranjang belanja Anda.',
+            );
+          },
           icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white),
         ),
         const SizedBox(width: 8),
@@ -111,7 +118,7 @@ class UMKMScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -156,7 +163,7 @@ class UMKMScreen extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primary
-                      : Colors.grey.withOpacity(0.1),
+                      : Colors.grey.withValues(alpha: 0.1),
                 ),
               ),
               child: Center(
@@ -302,13 +309,45 @@ class UMKMScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      p['price']!,
-                      style: GoogleFonts.manrope(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          p['price']!,
+                          style: GoogleFonts.manrope(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        SizedBox(
+                          height: 32,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              AuthUtils.showLoginRequirement(
+                                context,
+                                message: 'Silakan masuk terlebih dahulu untuk memesan produk UMKM ini.',
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              'Beli',
+                              style: GoogleFonts.manrope(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

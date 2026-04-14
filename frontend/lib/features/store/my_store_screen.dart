@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/services/api_service.dart';
+import '../../shared/models/store_models.dart';
+import '../admin/screens/location_picker_screen.dart';
+import 'package:latlong2/latlong.dart';
 
 class MyStoreScreen extends StatefulWidget {
   const MyStoreScreen({super.key});
@@ -10,7 +14,63 @@ class MyStoreScreen extends StatefulWidget {
 }
 
 class _MyStoreScreenState extends State<MyStoreScreen> {
-  bool isStoreOpen = true;
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  
+  bool _isLoading = true;
+  bool _isSaving = false;
+  StoreModel? _store;
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoreData();
+  }
+
+  Future<void> _loadStoreData() async {
+    setState(() => _isLoading = true);
+    final dashboard = await ApiService().getStoreDashboard();
+    if (mounted && dashboard != null) {
+      setState(() {
+        _store = dashboard.store;
+        _nameController.text = _store!.name;
+        _descriptionController.text = _store!.description;
+        _addressController.text = _store!.address;
+        _latitude = _store!.latitude;
+        _longitude = _store!.longitude;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    setState(() => _isSaving = true);
+    
+    final result = await ApiService().updateStoreProfile(
+      name: _nameController.text,
+      description: _descriptionController.text,
+      address: _addressController.text,
+      latitude: _latitude,
+      longitude: _longitude,
+    );
+
+    if (mounted) {
+      setState(() => _isSaving = false);
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,16 +86,18 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
         foregroundColor: Colors.black87,
         elevation: 0.5,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildStoreHeader(),
-            const SizedBox(height: 16),
-            _buildStoreForm(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildSaveButton(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildStoreHeader(),
+                  const SizedBox(height: 16),
+                  _buildStoreForm(),
+                ],
+              ),
+            ),
+      bottomNavigationBar: _isLoading ? null : _buildSaveButton(),
     );
   }
 
@@ -51,10 +113,12 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.orange.withOpacity(0.1),
-                border: Border.all(color: Colors.orange.withOpacity(0.3), width: 2),
-                image: const DecorationImage(
-                  image: NetworkImage('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop'), // Dummy Store Image
+                color: Colors.orange.withValues(alpha: 0.1),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
+                image: DecorationImage(
+                  image: NetworkImage(_store?.imageUrl.isNotEmpty == true 
+                    ? ApiService().getImageUrl(_store!.imageUrl) 
+                    : 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop'),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -84,43 +148,90 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Status Toko',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
-              ),
-              Switch(
-                value: isStoreOpen,
-                activeTrackColor: Colors.green.withOpacity(0.5),
-                activeThumbColor: Colors.green,
-                onChanged: (value) {
-                  setState(() {
-                    isStoreOpen = value;
-                  });
-                },
-              ),
-            ],
-          ),
           Text(
-            isStoreOpen ? 'Toko Buka (Menerima Pesanan)' : 'Toko Tutup Sementara',
+            'Status Verifikasi: ${_store?.status.toUpperCase()}',
             style: GoogleFonts.poppins(
               fontSize: 12,
-              color: isStoreOpen ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+              color: _store?.status == 'approved' ? Colors.green : Colors.orange,
             ),
           ),
           const Divider(height: 32),
-          _buildTextField('Nama Toko', 'Toko Berkah LocalMart'),
-          _buildTextField('Deskripsi', 'Menjual madu asli Sumbawa dan kopi Tepal', maxLines: 3),
-          _buildTextField('Alamat Toko', 'Jl. Bung Karno KTC Taliwang, Kab. Sumbawa Barat', maxLines: 2),
-          _buildTextField('Nomor WhatsApp', '081234567890', keyboardType: TextInputType.phone),
+          _buildTextField('Nama Toko', _nameController),
+          _buildTextField('Deskripsi', _descriptionController, maxLines: 3),
+          _buildTextField('Alamat Toko', _addressController, maxLines: 2),
+          const SizedBox(height: 8),
+          _buildCalibrationButton(),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, String hint, {int maxLines = 1, TextInputType? keyboardType}) {
+  Widget _buildCalibrationButton() {
+    return InkWell(
+      onTap: () async {
+        final result = await Navigator.push<LatLng>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LocationPickerScreen(
+              initialLat: _latitude,
+              initialLng: _longitude,
+            ),
+          ),
+        );
+
+        if (result != null) {
+          setState(() {
+            _latitude = result.latitude;
+            _longitude = result.longitude;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Lokasi berhasil dikalibrasi!')),
+            );
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on_rounded, color: Colors.orange),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Kalibrasi Alamat Map',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                  Text(
+                    _latitude != null && _longitude != null
+                        ? 'Koordinat: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}'
+                        : 'Titik peta belum ditentukan',
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700]),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.orange),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -136,12 +247,11 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            controller: controller,
             maxLines: maxLines,
             keyboardType: keyboardType,
             style: GoogleFonts.poppins(fontSize: 14),
             decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
               filled: true,
               fillColor: const Color(0xFFF8F9FA),
               border: OutlineInputBorder(
@@ -167,7 +277,7 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, -5),
             blurRadius: 10,
           ),
@@ -175,29 +285,25 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
       ),
       child: SafeArea(
         child: ElevatedButton(
-          onPressed: () {
-            // TODO: Save logic to Backend
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pengaturan Toko Berhasil Disimpan!')),
-            );
-            Navigator.pop(context);
-          },
+          onPressed: _isSaving ? null : _saveChanges,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange, // Orange suitable for Store actions
+            backgroundColor: Colors.orange,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
             ),
             elevation: 0,
           ),
-          child: Text(
-            'Simpan Perubahan',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+          child: _isSaving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : Text(
+                  'Simpan Perubahan',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );

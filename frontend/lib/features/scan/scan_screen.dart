@@ -67,7 +67,7 @@ class ScanScreen extends StatelessWidget {
                         child: Container(
                           width: 200,
                           height: 2,
-                          color: AppColors.primary.withOpacity(0.5),
+                          color: AppColors.primary.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -83,7 +83,7 @@ class ScanScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(30),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withValues(alpha: 0.7),
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   child: Row(

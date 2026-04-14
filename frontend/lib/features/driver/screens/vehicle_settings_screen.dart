@@ -75,7 +75,7 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
             color: isSelected ? Colors.indigo : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: isSelected ? Colors.indigo : Colors.grey[200]!),
-            boxShadow: isSelected ? [BoxShadow(color: Colors.indigo.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))] : [],
+            boxShadow: isSelected ? [BoxShadow(color: Colors.indigo.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5))] : [],
           ),
           child: Column(
             children: [
@@ -136,9 +136,9 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.indigo.withOpacity(0.05),
+        color: Colors.indigo.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.indigo.withOpacity(0.1)),
+        border: Border.all(color: Colors.indigo.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [

@@ -53,7 +53,8 @@ class LocalFoodScreen extends StatelessWidget {
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 100,
+      expandedHeight: 130,
+      toolbarHeight: 70,
       elevation: 0,
       backgroundColor: AppColors.primary,
       automaticallyImplyLeading: false,
@@ -88,7 +89,7 @@ class LocalFoodScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -134,7 +135,7 @@ class LocalFoodScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -212,7 +213,7 @@ class LocalFoodScreen extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.outlineVariant.withOpacity(0.2),
+                      color: AppColors.outlineVariant.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Icon(
@@ -261,7 +262,7 @@ class LocalFoodScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withOpacity(0.7),
+                    Colors.black.withValues(alpha: 0.7),
                     Colors.transparent,
                   ],
                   begin: Alignment.bottomCenter,
@@ -304,7 +305,7 @@ class LocalFoodScreen extends StatelessWidget {
                     'Dukung pedagang lokal, nikmati promonya.',
                     style: GoogleFonts.manrope(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -355,7 +356,7 @@ class LocalFoodScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.05),
+                  color: AppColors.primary.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -386,7 +387,7 @@ class LocalFoodScreen extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -436,7 +437,7 @@ class LocalFoodScreen extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

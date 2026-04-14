@@ -1,24 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/models/user_model.dart';
+import '../../../core/services/api_service.dart';
 
-class ShippingAddressScreen extends StatelessWidget {
+class ShippingAddressScreen extends StatefulWidget {
   const ShippingAddressScreen({super.key});
 
   @override
+  State<ShippingAddressScreen> createState() => _ShippingAddressScreenState();
+}
+
+class _ShippingAddressScreenState extends State<ShippingAddressScreen> {
+  UserModel? _user;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  void _loadProfile() async {
+    final user = await ApiService().getProfile();
+    if (mounted) {
+      setState(() {
+        _user = user;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final String receiverName = _user?.fullName ?? 'Memuat...';
+    final String receiverPhone = _user?.phone ?? '-';
+
     final List<Map<String, dynamic>> addresses = [
       {
         'label': 'Rumah Utama',
-        'receiver': 'Muhammad Akmal',
-        'phone': '081234567890',
+        'receiver': receiverName,
+        'phone': receiverPhone,
         'address': 'Jl. Bung Karno Komplek KTC Taliwang, Kab. Sumbawa Barat, Nusa Tenggara Barat',
         'isDefault': true,
       },
       {
         'label': 'Kost Taliwang',
-        'receiver': 'Akmal',
-        'phone': '081234567890',
+        'receiver': receiverName,
+        'phone': receiverPhone,
         'address': 'Jl. Udara No. 12, Kelurahan Menala, Taliwang, KSB',
         'isDefault': false,
       },
@@ -36,14 +65,16 @@ class ShippingAddressScreen extends StatelessWidget {
         foregroundColor: Colors.black87,
         elevation: 0.5,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: addresses.length,
-        itemBuilder: (context, index) {
-          final addr = addresses[index];
-          return _buildAddressCard(addr);
-        },
-      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: addresses.length,
+            itemBuilder: (context, index) {
+              final addr = addresses[index];
+              return _buildAddressCard(addr);
+            },
+          ),
       bottomNavigationBar: _buildAddAddressButton(context),
     );
   }
@@ -60,7 +91,7 @@ class ShippingAddressScreen extends StatelessWidget {
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -84,7 +115,7 @@ class ShippingAddressScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/glebarez/sqlite"
+	"github.com/ksb/localmart/backend/internal/models"
 	"gorm.io/gorm"
 )
 
@@ -21,5 +22,7 @@ func ConnectDB() {
 
 	DB = database
 	log.Println("Berhasil terhubung ke database SQLite (localmart.db)!")
-}
 
+	// Auto-migrate semua model dan seed data awal
+	models.Migrate(DB)
+}

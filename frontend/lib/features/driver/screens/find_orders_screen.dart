@@ -115,7 +115,7 @@ class _FindOrdersScreenState extends State<FindOrdersScreen> with SingleTickerPr
               color: Colors.indigo,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: Colors.indigo.withOpacity(0.5), blurRadius: 20, spreadRadius: 5),
+                BoxShadow(color: Colors.indigo.withValues(alpha: 0.5), blurRadius: 20, spreadRadius: 5),
               ],
             ),
             child: const Icon(Icons.my_location, color: Colors.white, size: 32),
@@ -191,7 +191,7 @@ class _FindOrdersScreenState extends State<FindOrdersScreen> with SingleTickerPr
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -200,7 +200,7 @@ class _FindOrdersScreenState extends State<FindOrdersScreen> with SingleTickerPr
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: order['color'].withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: order['color'].withValues(alpha: 0.1), shape: BoxShape.circle),
                 child: Icon(order['icon'], color: order['color'], size: 24),
               ),
               const SizedBox(width: 16),

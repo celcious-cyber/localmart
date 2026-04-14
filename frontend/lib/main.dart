@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'features/home/home_screen.dart';
 import 'core/theme/app_colors.dart';
+import 'core/services/api_service.dart';
+import 'features/auth/widgets/auth_utils.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Periksa status login dari penyimpanan lokal (Persistence)
+  final isLoggedIn = await ApiService().isLoggedIn();
+  AuthUtils.isLoggedIn = isLoggedIn;
+
   runApp(const LocalMartApp());
 }
 

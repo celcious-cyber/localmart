@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/services/api_service.dart';
+import '../../../shared/models/home_data.dart';
 
 class StoreRegistrationForm extends StatefulWidget {
   final Function(String storeName, String category) onRegister;
@@ -13,8 +15,27 @@ class StoreRegistrationForm extends StatefulWidget {
 class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
   final _formKey = GlobalKey<FormState>();
   String _storeName = '';
+  String _address = '';
   String? _selectedCategory;
-  final List<String> _categories = ['Kuliner', 'Fashion', 'Sembako', 'Elektronik', 'Jasa', 'Lainnya'];
+  
+  List<CategoryModel> _apiCategories = [];
+  bool _isLoadingCategories = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  Future<void> _fetchCategories() async {
+    final cats = await ApiService().getCategories();
+    if (mounted) {
+      setState(() {
+        _apiCategories = cats;
+        _isLoadingCategories = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +50,7 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.storefront_rounded, size: 64, color: Colors.orange),
@@ -58,18 +79,21 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
             ),
             const SizedBox(height: 20),
             _buildLabel('Kategori Bisnis'),
-            DropdownButtonFormField<String>(
-              decoration: _inputDecoration('Pilih kategori'),
-              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-              onChanged: (v) => setState(() => _selectedCategory = v),
-              validator: (v) => v == null ? 'Pilih satu kategori' : null,
-            ),
+            _isLoadingCategories
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    decoration: _inputDecoration('Pilih kategori'),
+                    items: _apiCategories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
+                    onChanged: (v) => setState(() => _selectedCategory = v),
+                    validator: (v) => v == null ? 'Pilih satu kategori' : null,
+                  ),
             const SizedBox(height: 20),
             _buildLabel('Alamat Lengkap Toko'),
             TextFormField(
               maxLines: 2,
               decoration: _inputDecoration('Contoh: Jl. Raya KM 01, Taliwang'),
               validator: (v) => v == null || v.isEmpty ? 'Alamat wajib diisi' : null,
+              onSaved: (v) => _address = v ?? '',
             ),
             const SizedBox(height: 40),
             SizedBox(
@@ -127,10 +151,37 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
     );
   }
 
-  void _submit() {
+  void _submit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      widget.onRegister(_storeName, _selectedCategory!);
+      
+      // Tampilkan loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.orange)),
+      );
+
+      final result = await ApiService().registerStore(
+        name: _storeName,
+        category: _selectedCategory!,
+        address: _address,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading
+
+        if (result['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+          );
+          widget.onRegister(_storeName, _selectedCategory!);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+          );
+        }
+      }
     }
   }
 }

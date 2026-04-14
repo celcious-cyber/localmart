@@ -32,7 +32,8 @@ class TransportScreen extends StatelessWidget {
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 100,
+      expandedHeight: 130,
+      toolbarHeight: 70,
       elevation: 0,
       backgroundColor: AppColors.primary,
       automaticallyImplyLeading: false,
@@ -59,7 +60,7 @@ class TransportScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -105,7 +106,7 @@ class TransportScreen extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -139,7 +140,7 @@ class TransportScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -204,7 +205,7 @@ class TransportScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withOpacity(0.05) : Colors.white,
+            color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent, width: 2),
           ),
@@ -214,7 +215,7 @@ class TransportScreen extends StatelessWidget {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: (isSelected ? AppColors.primary : Colors.grey).withOpacity(0.1),
+                  color: (isSelected ? AppColors.primary : Colors.grey).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ClipRRect(

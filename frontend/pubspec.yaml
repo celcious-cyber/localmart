@@ -37,6 +37,12 @@ dependencies:
   carousel_slider: ^5.0.0
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.17
+  shared_preferences: ^2.5.5
+  image_picker: ^1.1.2
+  image_cropper: ^8.0.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^13.0.1
 
 dev_dependencies:
   flutter_test:

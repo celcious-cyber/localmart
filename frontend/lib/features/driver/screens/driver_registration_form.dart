@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/services/api_service.dart';
 
 class DriverRegistrationForm extends StatefulWidget {
   final Function(String driverName, String plateNumber, String vehicleType) onRegister;
@@ -14,6 +15,7 @@ class _DriverRegistrationFormState extends State<DriverRegistrationForm> {
   final _formKey = GlobalKey<FormState>();
   String _fullName = '';
   String _plateNumber = '';
+  String _waNumber = '';
   String? _selectedVehicleType;
   final List<String> _vehicleTypes = ['Sepeda Motor (Standard)', 'Motor Listrik', 'Mobil (4 Kursi)', 'Mobil (6 Kursi)'];
 
@@ -30,7 +32,7 @@ class _DriverRegistrationFormState extends State<DriverRegistrationForm> {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.withOpacity(0.1),
+                  color: Colors.indigo.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.delivery_dining_rounded, size: 64, color: Colors.indigo),
@@ -79,6 +81,7 @@ class _DriverRegistrationFormState extends State<DriverRegistrationForm> {
               keyboardType: TextInputType.phone,
               decoration: _inputDecoration('Contoh: 081234567XXX'),
               validator: (v) => v == null || v.isEmpty ? 'Nomor WhatsApp wajib diisi' : null,
+              onSaved: (v) => _waNumber = v ?? '',
             ),
             const SizedBox(height: 40),
             SizedBox(
@@ -136,10 +139,37 @@ class _DriverRegistrationFormState extends State<DriverRegistrationForm> {
     );
   }
 
-  void _submit() {
+  void _submit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      widget.onRegister(_fullName, _plateNumber, _selectedVehicleType!);
+      
+      // Tampilkan loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
+      );
+
+      final result = await ApiService().registerDriver(
+        vehicleType: _selectedVehicleType!,
+        plateNumber: _plateNumber,
+        phoneNumber: _waNumber,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading
+
+        if (result['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+          );
+          widget.onRegister(_fullName, _plateNumber, _selectedVehicleType!);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+          );
+        }
+      }
     }
   }
 }

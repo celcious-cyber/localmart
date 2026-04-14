@@ -1,62 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/services/api_service.dart';
+import '../../../shared/models/store_models.dart';
 
-class IncomingOrdersScreen extends StatelessWidget {
+class IncomingOrdersScreen extends StatefulWidget {
   const IncomingOrdersScreen({super.key});
 
   @override
+  State<IncomingOrdersScreen> createState() => _IncomingOrdersScreenState();
+}
+
+class _IncomingOrdersScreenState extends State<IncomingOrdersScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final List<String> _tabs = ['Baru', 'Diproses', 'Dikirim', 'Selesai'];
+  
+  Map<String, List<OrderModel>> _ordersByStatus = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _loadAllOrders();
+  }
+
+  Future<void> _loadAllOrders() async {
+    setState(() => _isLoading = true);
+    final Map<String, List<OrderModel>> tempMap = {};
+    
+    for (var tab in _tabs) {
+      tempMap[tab] = await ApiService().getStoreOrders(tab);
+    }
+
+    if (mounted) {
+      setState(() {
+        _ordersByStatus = tempMap;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _updateStatus(OrderModel order, String newBackendStatus) async {
+    // Tampilkan loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.orange)),
+    );
+
+    final result = await ApiService().updateOrderStatus(order.id, newBackendStatus);
+    
+    if (mounted) {
+      Navigator.pop(context); // Tutup loading
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+        );
+        _loadAllOrders(); // Refresh
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
-        appBar: AppBar(
-          title: Text(
-            'Pesanan Masuk',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0.5,
-          bottom: TabBar(
-            isScrollable: true,
-            labelColor: Colors.orange,
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.orange,
-            labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 13),
-            tabs: const [
-              Tab(text: 'Pesanan Baru'),
-              Tab(text: 'Diproses'),
-              Tab(text: 'Dikirim'),
-              Tab(text: 'Selesai'),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: Text(
+          'Pesanan Masuk',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        body: TabBarView(
-          children: [
-            _buildOrderList('Baru'),
-            _buildOrderList('Diproses'),
-            _buildOrderList('Dikirim'),
-            _buildOrderList('Selesai'),
-          ],
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0.5,
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          labelColor: Colors.orange,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.orange,
+          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 13),
+          tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadAllOrders,
+          ),
+        ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          : TabBarView(
+              controller: _tabController,
+              children: _tabs.map((status) => _buildOrderList(status)).toList(),
+            ),
     );
   }
 
   Widget _buildOrderList(String status) {
-    // Dummy Data Based on Status
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: 2,
-      itemBuilder: (context, index) {
-        return _buildOrderCard(status);
-      },
+    final orders = _ordersByStatus[status] ?? [];
+    
+    if (orders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.assignment_outlined, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text('Tidak ada pesanan $status', style: GoogleFonts.poppins(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadAllOrders,
+      color: Colors.orange,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: orders.length,
+        itemBuilder: (context, index) {
+          return _buildOrderCard(orders[index], status);
+        },
+      ),
     );
   }
 
-  Widget _buildOrderCard(String status) {
+  Widget _buildOrderCard(OrderModel order, String displayStatus) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
@@ -64,7 +140,7 @@ class IncomingOrdersScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -74,17 +150,17 @@ class IncomingOrdersScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '#LM-990$status',
+                '#${order.orderNumber}',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  status,
+                  displayStatus,
                   style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
                 ),
               ),
@@ -107,8 +183,16 @@ class IncomingOrdersScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Muhammad Akmal', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('Kopi Tepal Original x2', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+                    Text(
+                      '${order.user?.firstName ?? 'Customer'} ${order.user?.lastName ?? ''}', 
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)
+                    ),
+                    Text(
+                      order.items.map((i) => '${i.product?.name ?? 'Item'} x${i.quantity}').join(', '), 
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
@@ -122,18 +206,41 @@ class IncomingOrdersScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Total Pesanan', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
-                  Text('Rp 90.000', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.orange)),
+                  Text(
+                    'Rp ${order.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}', 
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.orange)
+                  ),
                 ],
               ),
-              if (status == 'Baru')
+              if (displayStatus == 'Baru')
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => _updateStatus(order, 'processed'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
                   child: Text('Terima', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                )
+              else if (displayStatus == 'Diproses')
+                ElevatedButton(
+                  onPressed: () => _updateStatus(order, 'shipping'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text('Kirim', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                )
+              else if (displayStatus == 'Dikirim')
+                ElevatedButton(
+                  onPressed: () => _updateStatus(order, 'completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text('Selesai', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
                 )
               else
                 OutlinedButton(
