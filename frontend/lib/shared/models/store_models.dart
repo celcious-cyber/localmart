@@ -46,6 +46,12 @@ class StoreModel {
   final String level;
   final double latitude;
   final double longitude;
+  final String village;
+  final String district;
+  final bool isVerified;
+  final double rating;
+  final int reviewCount;
+  final int productCount;
   final bool isActive;
 
   StoreModel({
@@ -61,6 +67,12 @@ class StoreModel {
     required this.level,
     required this.latitude,
     required this.longitude,
+    this.village = '',
+    this.district = '',
+    this.isVerified = false,
+    this.rating = 0,
+    this.reviewCount = 0,
+    this.productCount = 0,
     required this.isActive,
   });
 
@@ -78,6 +90,12 @@ class StoreModel {
       level: json['level'] ?? 'regular',
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      village: json['village'] ?? '',
+      district: json['district'] ?? '',
+      isVerified: json['is_verified'] ?? false,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: json['review_count'] ?? 0,
+      productCount: json['product_count'] ?? 0,
       isActive: json['is_active'] ?? true,
     );
   }

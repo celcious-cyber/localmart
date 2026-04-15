@@ -251,26 +251,48 @@ class ApiService {
     return [];
   }
 
-  Future<Map<String, dynamic>> createStoreProduct(ProductModel product) async {
+  Future<Map<String, dynamic>> createStoreProductMulti(Map<String, dynamic> data, List<Uint8List> images) async {
     try {
-      final response = await _dio.post('/user/store/products', data: product.toJson());
+      final formData = FormData.fromMap(data);
+      
+      for (int i = 0; i < images.length; i++) {
+        formData.files.add(MapEntry(
+          'images[]',
+          MultipartFile.fromBytes(images[i], filename: 'product_image_$i.jpg'),
+        ));
+      }
+
+      final response = await _dio.post('/user/store/products', data: formData);
       if (response.statusCode == 201 && response.data['success'] == true) {
-        return {'success': true, 'message': 'Produk berhasil ditambahkan', 'data': ProductModel.fromJson(response.data['data'])};
+        return {'success': true, 'message': 'Produka berhasil ditambahkan', 'data': response.data['data']};
       }
       return {'success': false, 'message': response.data['message'] ?? 'Gagal tambah produk'};
     } catch (e) {
+      debugPrint('Error createStoreProductMulti: $e');
       return {'success': false, 'message': 'Gagal terhubung ke server'};
     }
   }
 
-  Future<Map<String, dynamic>> updateStoreProduct(ProductModel product) async {
+  Future<Map<String, dynamic>> updateStoreProductMulti(int id, Map<String, dynamic> data, List<Uint8List> images) async {
     try {
-      final response = await _dio.put('/user/store/products/${product.id}', data: product.toJson());
+      final formData = FormData.fromMap(data);
+      
+      for (int i = 0; i < images.length; i++) {
+        formData.files.add(MapEntry(
+          'images[]',
+          MultipartFile.fromBytes(images[i], filename: 'update_image_$i.jpg'),
+        ));
+      }
+
+      // We use POST with _method=PUT for multipart compatibility if needed, 
+      // but Gin handles PUT multipart fine.
+      final response = await _dio.put('/user/store/products/$id', data: formData);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Produk berhasil diperbarui'};
       }
       return {'success': false, 'message': response.data['message'] ?? 'Gagal update produk'};
     } catch (e) {
+      debugPrint('Error updateStoreProductMulti: $e');
       return {'success': false, 'message': 'Gagal terhubung ke server'};
     }
   }
@@ -325,6 +347,10 @@ class ApiService {
     if (path.isEmpty) return 'https://via.placeholder.com/400x200?text=No+Image';
     if (path.startsWith('http')) return path;
     return 'http://localhost:8080$path';
+  }
+
+  String formatCurrency(double amount) {
+    return 'Rp ${amount.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]}.")}';
   }
 
   Future<HomeResponseModel?> getHomeData() async {

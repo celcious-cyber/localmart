@@ -22,6 +22,11 @@ func Migrate(db *gorm.DB) {
 		&Order{},
 		&OrderItem{},
 		&ProductImage{},
+		&ProductVariant{},
+		&Review{},
+		&Favorite{},
+		&StoreFollower{},
+		&CartItem{},
 	)
 	if err != nil {
 		log.Fatal("Gagal auto-migrate database:", err)
@@ -106,15 +111,45 @@ func seedData(db *gorm.DB) {
 	// === SEED CATEGORIES ===
 	var catCount int64
 	db.Model(&Category{}).Count(&catCount)
-	if catCount == 0 {
+	if catCount <= 4 { // If old English categories or empty
+		// Simple clean start for categories
+		db.Exec("DELETE FROM categories")
 		categories := []Category{
-			{Name: "Food & Drink", Slug: "food-drink", IconName: "restaurant", SortOrder: 1, IsActive: true},
-			{Name: "Fashion", Slug: "fashion", IconName: "checkroom", SortOrder: 2, IsActive: true},
-			{Name: "Elektronik", Slug: "elektronik", IconName: "devices", SortOrder: 3, IsActive: true},
-			{Name: "Asesoris", Slug: "asesoris", IconName: "watch", SortOrder: 4, IsActive: true},
+			{Name: "Hasil Bumi", Slug: "hasil-bumi", IconName: "agriculture", SortOrder: 1, IsActive: true},
+			{Name: "Pangan Lokal", Slug: "pangan-lokal", IconName: "restaurant", SortOrder: 2, IsActive: true},
+			{Name: "Kerajinan UMKM", Slug: "kerajinan-umkm", IconName: "brush", SortOrder: 3, IsActive: true},
+			{Name: "Sewa & Rental", Slug: "sewa-rental", IconName: "car_rental", SortOrder: 4, IsActive: true},
+			{Name: "Wisata Lokal", Slug: "wisata-lokal", IconName: "tour", SortOrder: 5, IsActive: true},
+			{Name: "Jasa Ahli", Slug: "jasa-ahli", IconName: "handyman", SortOrder: 6, IsActive: true},
+			{Name: "Elektronik", Slug: "elektronik", IconName: "devices", SortOrder: 7, IsActive: true},
 		}
 		db.Create(&categories)
-		log.Println("Seed: Categories dibuat")
+		log.Println("Seed: Categories (Localized) dibuat")
+	}
+
+	// === SEED STORES ===
+	var storeCount int64
+	db.Model(&Store{}).Count(&storeCount)
+	if storeCount == 0 {
+		// Ambil User
+		var user User
+		db.First(&user)
+		if user.ID != 0 {
+			store := Store{
+				UserID:      user.ID,
+				Name:        "KSB Kuliner",
+				Category:    "Makanan & Minuman",
+				Description: "Pusat kuliner terbaik di Sumbawa Barat.",
+				Address:     "Jl. Raya Taliwang No. 123",
+				Village:     "Kuang",
+				District:    "Taliwang",
+				IsVerified:  true,
+				IsActive:    true,
+				Status:      "approved",
+			}
+			db.Create(&store)
+			log.Println("Seed: Store default dibuat")
+		}
 	}
 
 	// === SEED PRODUCTS ===
@@ -218,6 +253,18 @@ func seedData(db *gorm.DB) {
 		}
 		db.Create(&products)
 		log.Println("Seed: Products dibuat")
+
+		// === SEED VARIANTS ===
+		var p Product
+		db.Where("name = ?", "Nasi Goreng Spesial KSB").First(&p)
+		if p.ID != 0 {
+			variants := []ProductVariant{
+				{ProductID: p.ID, Name: "Porsi Kecil", Price: 75000, Stock: 20},
+				{ProductID: p.ID, Name: "Porsi Besar", Price: 90000, Stock: 15},
+			}
+			db.Create(&variants)
+			log.Println("Seed: Product Variants dibuat")
+		}
 	}
 
 	// === SEED DISCOVERY TABS ===

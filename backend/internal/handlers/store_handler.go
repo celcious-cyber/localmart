@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -144,8 +146,9 @@ func UploadImage(c *gin.Context) {
 	})
 }
 
-// CreateStoreProduct - POST /api/v1/user/store/products
+// CreateStoreProduct - POST /api/v1/user/store/products (Multipart)
 func CreateStoreProduct(c *gin.Context) {
+	c.Request.ParseMultipartForm(8 << 20) // 8MB limit
 	userID, _ := c.Get("user_id")
 	uid := userID.(uint)
 
@@ -155,44 +158,94 @@ func CreateStoreProduct(c *gin.Context) {
 		return
 	}
 
-	var product models.Product
-	if err := c.ShouldBindJSON(&product); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data produk tidak valid"})
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Gagal membaca data multipart"})
 		return
 	}
 
-	// Gunakan Transaction untuk memastikan konsistensi (Produk + Images)
-	log.Printf("Menyimpan produk baru: %s dengan %d gambar", product.Name, len(product.Images))
+	// 1. Basic Fields
+	price, _ := strconv.ParseFloat(c.PostForm("price"), 64)
+	categoryID, _ := strconv.Atoi(c.PostForm("category_id"))
+	stock, _ := strconv.Atoi(c.PostForm("stock"))
+	minOrder, _ := strconv.Atoi(c.PostForm("min_order"))
 	
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Simpan produk utama
-		product.StoreID = store.ID
+	// Logistics
+	weight, _ := strconv.ParseFloat(c.PostForm("weight"), 64)
+	length, _ := strconv.Atoi(c.PostForm("length"))
+	width, _ := strconv.Atoi(c.PostForm("width"))
+	height, _ := strconv.Atoi(c.PostForm("height"))
+
+	product := models.Product{
+		StoreID:     store.ID,
+		CategoryID:  uint(categoryID),
+		Name:        c.PostForm("name"),
+		Description: c.PostForm("description"),
+		Price:       price,
+		Stock:       stock,
+		Condition:   c.PostForm("condition"),
+		Brand:       c.PostForm("brand"),
+		SKU:         c.PostForm("sku"),
+		MinOrder:    minOrder,
+		ProductType: c.PostForm("product_type"),
+		Metadata:    c.PostForm("metadata"), // Stringified JSON dari frontend
+		Weight:      weight,
+		Length:      length,
+		Width:       width,
+		Height:      height,
+	}
+
+	// 2. Parse Variants (JSON String)
+	variantsJSON := c.PostForm("variants")
+	if variantsJSON != "" && variantsJSON != "[]" {
+		if err := json.Unmarshal([]byte(variantsJSON), &product.Variants); err != nil {
+			log.Printf("Gagal parse varian: %v", err)
+		}
+	}
+
+	// 3. Process Images
+	files := form.File["images[]"]
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&product).Error; err != nil {
 			return err
 		}
-		// GORM akan otomatis menyimpan product.Images karena ada foreignKey
-		// Tapi kita bisa paksa jika perlu: tx.Model(&product).Association("Images").Replace(product.Images)
+
+		// Handle Uploaded Images
+		for i, file := range files {
+			ext := filepath.Ext(file.Filename)
+			if ext == "" { ext = ".jpg" }
+			filename := fmt.Sprintf("prod_%d_%d_%d%s", product.ID, i, time.Now().Unix(), ext)
+			savePath := filepath.Join("uploads", filename)
+			
+			if err := c.SaveUploadedFile(file, savePath); err != nil {
+				return err
+			}
+
+			url := "/uploads/" + filename
+			if i == 0 {
+				tx.Model(&product).Update("image_url", url)
+			}
+			
+			img := models.ProductImage{ProductID: product.ID, ImageURL: url}
+			if err := tx.Create(&img).Error; err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 
 	if err != nil {
-		log.Printf("Gagal simpan produk: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal menambahkan produk: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal simpan produk: " + err.Error()})
 		return
 	}
 
-	// Reload dengan images untuk response
-	config.DB.Preload("Images").First(&product, product.ID)
-
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"message": "Produk berhasil ditambahkan",
-		"data":    product,
-	})
+	config.DB.Preload("Images").Preload("Variants").First(&product, product.ID)
+	c.JSON(http.StatusCreated, gin.H{"success": true, "message": "Produk berhasil ditambahkan", "data": product})
 }
 
-// UpdateStoreProduct - PUT /api/v1/user/store/products/:id
+// UpdateStoreProduct - PUT /api/v1/user/store/products/:id (Multipart)
 func UpdateStoreProduct(c *gin.Context) {
+	c.Request.ParseMultipartForm(8 << 20) // 8MB limit
 	userID, _ := c.Get("user_id")
 	uid := userID.(uint)
 	productID := c.Param("id")
@@ -205,27 +258,79 @@ func UpdateStoreProduct(c *gin.Context) {
 
 	var product models.Product
 	if err := config.DB.Where("id = ? AND store_id = ?", productID, store.ID).First(&product).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Produk tidak ditemukan atau bukan milik Anda"})
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Produk tidak ditemukan"})
 		return
 	}
 
-	if err := c.ShouldBindJSON(&product); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data update tidak valid"})
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Gagal membaca data multipart"})
 		return
 	}
 
-	log.Printf("Update produk ID %s: %s dengan %d gambar", productID, product.Name, len(product.Images))
+	// 1. Map Fields
+	price, _ := strconv.ParseFloat(c.PostForm("price"), 64)
+	categoryID, _ := strconv.Atoi(c.PostForm("category_id"))
+	stock, _ := strconv.Atoi(c.PostForm("stock"))
+	minOrder, _ := strconv.Atoi(c.PostForm("min_order"))
+	
+	weight, _ := strconv.ParseFloat(c.PostForm("weight"), 64)
+	length, _ := strconv.Atoi(c.PostForm("length"))
+	width, _ := strconv.Atoi(c.PostForm("width"))
+	height, _ := strconv.Atoi(c.PostForm("height"))
 
-	// Gunakan Transaction untuk memastikan konsistensi update
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Update data utama produk
+	product.Name = c.PostForm("name")
+	product.CategoryID = uint(categoryID)
+	product.Description = c.PostForm("description")
+	product.Price = price
+	product.Stock = stock
+	product.Condition = c.PostForm("condition")
+	product.Brand = c.PostForm("brand")
+	product.SKU = c.PostForm("sku")
+	product.MinOrder = minOrder
+	product.ProductType = c.PostForm("product_type")
+	product.Metadata = c.PostForm("metadata")
+	product.Weight = weight
+	product.Length = length
+	product.Width = width
+	product.Height = height
+
+	// 2. Parse Variants & Existing Images
+	var variants []models.ProductVariant
+	json.Unmarshal([]byte(c.PostForm("variants")), &variants)
+	
+	var existingImages []string
+	json.Unmarshal([]byte(c.PostForm("existing_images")), &existingImages)
+
+	// 3. Process Transaction
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&product).Error; err != nil {
 			return err
 		}
-		// 2. Sinkronkan asosisasi Images (Replace yang lama dengan yang baru)
-		if err := tx.Model(&product).Association("Images").Replace(product.Images); err != nil {
-			log.Printf("Gagal sinkron gambar: %v", err)
-			return err
+
+		// Update Variants (Replace)
+		tx.Where("product_id = ?", product.ID).Delete(&models.ProductVariant{})
+		for i := range variants {
+			variants[i].ProductID = product.ID
+			variants[i].ID = 0
+		}
+		if len(variants) > 0 {
+			tx.Create(&variants)
+		}
+
+		// Update Images
+		tx.Where("product_id = ? AND image_url NOT IN ?", product.ID, existingImages).Delete(&models.ProductImage{})
+		
+		// New Image Uploads
+		files := form.File["images[]"]
+		for i, file := range files {
+			filename := fmt.Sprintf("upd_%d_%d_%d%s", product.ID, i, time.Now().Unix(), filepath.Ext(file.Filename))
+			savePath := filepath.Join("uploads", filename)
+			if err := c.SaveUploadedFile(file, savePath); err != nil {
+				return err
+			}
+			url := "/uploads/" + filename
+			tx.Create(&models.ProductImage{ProductID: product.ID, ImageURL: url})
 		}
 		return nil
 	})
@@ -235,11 +340,8 @@ func UpdateStoreProduct(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Produk berhasil diperbarui",
-		"data":    product,
-	})
+	config.DB.Preload("Images").Preload("Variants").First(&product, product.ID)
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Produk berhasil diperbarui", "data": product})
 }
 
 // DeleteStoreProduct - DELETE /api/v1/user/store/products/:id

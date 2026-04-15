@@ -49,20 +49,42 @@ type Product struct {
 	StoreID     uint      `gorm:"index" json:"store_id"`     // 0 jika produk global/admin
 	Stock       int       `gorm:"default:0" json:"stock"`
 	Sold        int       `gorm:"default:0" json:"sold"`
+	Rating      float64   `gorm:"default:0" json:"rating"`
+	ReviewCount int       `gorm:"default:0" json:"review_count"`
 	
-	// Dimensi & Berat
+	// Dimensi & Berat & Logistics
 	Weight      float64   `gorm:"default:0" json:"weight"` // dalam gram
 	Length      int       `gorm:"default:0" json:"length"` // dalam cm
 	Width       int       `gorm:"default:0" json:"width"`  // dalam cm
 	Height      int       `gorm:"default:0" json:"height"` // dalam cm
+	
+	// Professional Metadata
+	Condition   string    `gorm:"size:20;default:'Baru'" json:"condition"` // "Baru" atau "Bekas"
+	Brand       string    `gorm:"size:100" json:"brand"`
+	SKU         string    `gorm:"size:100" json:"sku"`
+	MinOrder    int       `gorm:"default:1" json:"min_order"`
+	
+	// Modular Features (V2)
+	ProductType string    `gorm:"size:20;not null;default:'BARANG'" json:"product_type"` // BARANG, JASA, RENTAL, WISATA
+	Metadata    string    `gorm:"type:text" json:"metadata"`                           // JSON Stringified data
 	
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Associations
-	Store  *Store         `gorm:"foreignKey:StoreID" json:"store,omitempty"`
-	Images []ProductImage `gorm:"foreignKey:ProductID" json:"images,omitempty"`
+	Store    *Store           `gorm:"foreignKey:StoreID" json:"store,omitempty"`
+	Images   []ProductImage   `gorm:"foreignKey:ProductID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"images,omitempty"`
+	Variants []ProductVariant `gorm:"foreignKey:ProductID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"variants,omitempty"`
+}
+
+// ProductVariant - varian untuk produk (ukuran, kemasan, dll)
+type ProductVariant struct {
+	ID        uint    `gorm:"primaryKey" json:"id"`
+	ProductID uint    `gorm:"not null;index" json:"product_id"`
+	Name      string  `gorm:"size:100;not null" json:"name"`
+	Price     float64 `gorm:"not null" json:"price"`
+	Stock     int     `gorm:"default:0" json:"stock"`
 }
 
 // Section - kontrol tampilan section di homepage
@@ -125,12 +147,18 @@ type Store struct {
 	ImageURL    string    `gorm:"size:500" json:"image_url"`
 	Balance     float64   `gorm:"default:0" json:"balance"`
 	Status      string    `gorm:"size:20;default:'pending'" json:"status"` // "pending", "approved", "rejected"
-	Level       string    `gorm:"size:20;default:'regular'" json:"level"` // "regular", "star", "mall"
-	Latitude    float64   `gorm:"default:0" json:"latitude"`
-	Longitude   float64   `gorm:"default:0" json:"longitude"`
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Level        string    `gorm:"size:20;default:'regular'" json:"level"` // "regular", "star", "mall"
+	Latitude     float64   `gorm:"default:0" json:"latitude"`
+	Longitude    float64   `gorm:"default:0" json:"longitude"`
+	Village      string    `gorm:"size:100" json:"village"`
+	District     string    `gorm:"size:100" json:"district"`
+	IsVerified   bool      `gorm:"default:false" json:"is_verified"`
+	Rating       float64   `gorm:"default:0" json:"rating"`
+	ReviewCount  int       `gorm:"default:0" json:"review_count"`
+	ProductCount int       `gorm:"default:0" json:"product_count"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 
 	// Associations
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -193,4 +221,50 @@ type OrderItem struct {
 
 func (OrderItem) TableName() string {
 	return "order_items"
+}
+
+// Review - ulasan produk dari pembeli
+type Review struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	ProductID uint      `gorm:"not null;index" json:"product_id"`
+	UserID    uint      `gorm:"not null;index" json:"user_id"`
+	OrderID   uint      `gorm:"index" json:"order_id"` // Opsional, bisa review tanpa order jika diizinkan
+	Rating    int       `gorm:"not null" json:"rating"`
+	Comment   string    `gorm:"type:text" json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
+	
+	// Associations
+	User    User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+}
+
+// Favorite - produk yang disukai user
+type Favorite struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"not null;index" json:"user_id"`
+	ProductID uint      `gorm:"not null;index" json:"product_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Associations
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+}
+
+// StoreFollower - pengikut toko
+type StoreFollower struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"not null;index" json:"user_id"`
+	StoreID   uint      `gorm:"not null;index" json:"store_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// CartItem - item dalam keranjang belanja
+type CartItem struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"not null;index" json:"user_id"`
+	ProductID uint      `gorm:"not null;index" json:"product_id"`
+	Quantity  int       `gorm:"not null;default:1" json:"quantity"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Associations
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }

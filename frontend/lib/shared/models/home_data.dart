@@ -90,18 +90,26 @@ class ProductModel {
   final String name;
   final String description;
   final double price;
-  final String imageUrl; // thumbnail
+  final String imageUrl;
   final int stock;
   final int sold;
-  final bool isActive;
-  
-  // New Fields
+  final double rating;
+  final int reviewCount;
   final double weight;
   final int length;
   final int width;
   final int height;
+  final String condition;
+  final String brand;
+  final String sku;
+  final int minOrder;
+  final String productType;
+  final String metadata;
+  final bool isActive;
   final List<ProductImageModel> images;
+  final List<ProductVariantModel> variants;
   final StoreModel? store;
+  final DateTime? createdAt;
 
   ProductModel({
     required this.id,
@@ -111,15 +119,25 @@ class ProductModel {
     required this.description,
     required this.price,
     required this.imageUrl,
-    required this.stock,
-    required this.sold,
-    required this.isActive,
+    this.stock = 0,
+    this.sold = 0,
+    this.rating = 0.0,
+    this.reviewCount = 0,
     this.weight = 0,
     this.length = 0,
     this.width = 0,
     this.height = 0,
+    this.condition = 'Baru',
+    this.brand = '',
+    this.sku = '',
+    this.minOrder = 1,
+    this.productType = 'BARANG',
+    this.metadata = '{}',
+    this.isActive = true,
     this.images = const [],
+    this.variants = const [],
     this.store,
+    this.createdAt,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -134,15 +152,30 @@ class ProductModel {
       stock: json['stock'] ?? 0,
       sold: json['sold'] ?? 0,
       isActive: json['is_active'] ?? true,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: json['review_count'] ?? 0,
       weight: (json['weight'] as num?)?.toDouble() ?? 0.0,
       length: json['length'] ?? 0,
       width: json['width'] ?? 0,
       height: json['height'] ?? 0,
+      condition: json['condition'] ?? 'Baru',
+      brand: json['brand'] ?? '',
+      sku: json['sku'] ?? '',
+      minOrder: json['min_order'] ?? 1,
+      productType: json['product_type'] ?? 'BARANG',
+      metadata: json['metadata'] ?? '{}',
       images: (json['images'] as List?)
-              ?.map((i) => ProductImageModel.fromJson(i))
-              .toList() ??
+          ?.map((e) => ProductImageModel.fromJson(e))
+          .toList() ??
+          [],
+      variants: (json['variants'] as List?)
+          ?.map((e) => ProductVariantModel.fromJson(e))
+          .toList() ??
           [],
       store: json['store'] != null ? StoreModel.fromJson(json['store']) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
     );
   }
 
@@ -150,20 +183,65 @@ class ProductModel {
     return {
       'id': id,
       'category_id': categoryId,
-      'store_id': storeId,
       'name': name,
       'description': description,
       'price': price,
       'image_url': imageUrl,
+      'store_id': storeId,
       'stock': stock,
       'sold': sold,
+      'rating': rating,
+      'review_count': reviewCount,
       'is_active': isActive,
       'weight': weight,
       'length': length,
       'width': width,
       'height': height,
+      'condition': condition,
+      'brand': brand,
+      'sku': sku,
+      'min_order': minOrder,
+      'product_type': productType,
+      'metadata': metadata,
+      'created_at': createdAt?.toIso8601String(),
       'images': images.map((i) => i.toJson()).toList(),
-      'store': store?.id, // Simplified for toJson if needed, or full object
+      'variants': variants.map((v) => v.toJson()).toList(),
+    };
+  }
+}
+
+class ProductVariantModel {
+  final int id;
+  final int productId;
+  final String name;
+  final double price;
+  final int stock;
+
+  ProductVariantModel({
+    required this.id,
+    required this.productId,
+    required this.name,
+    required this.price,
+    required this.stock,
+  });
+
+  factory ProductVariantModel.fromJson(Map<String, dynamic> json) {
+    return ProductVariantModel(
+      id: json['id'] ?? 0,
+      productId: json['product_id'] ?? 0,
+      name: json['name'] ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      stock: json['stock'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'product_id': productId,
+      'name': name,
+      'price': price,
+      'stock': stock,
     };
   }
 }

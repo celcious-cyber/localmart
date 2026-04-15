@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Brand Colors
-  static const Color primary = Color(0xFF006766); // Teal Horizon Primary
+  static const Color primary = Color(0xFF006765); // Teal Horizon Primary
   static const Color secondary = Color(0xFF35B7B2);
   static const Color primaryContainer = Color(0xFF008281);
   

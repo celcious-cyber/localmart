@@ -32,7 +32,7 @@ class _StoreStatsScreenState extends State<StoreStatsScreen> {
   }
 
   String _formatCurrency(double amount) {
-    return 'Rp ${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+    return ApiService().formatCurrency(amount);
   }
 
   @override
