@@ -12,6 +12,7 @@ class UserModel {
   final String? birthDate;
   final StoreModel? store;
   final DriverModel? driver;
+  final double points;
 
   UserModel({
     required this.id,
@@ -24,6 +25,7 @@ class UserModel {
     this.birthDate,
     this.store,
     this.driver,
+    this.points = 0.0,
   });
 
   String get fullName => '$firstName $lastName'.trim();
@@ -38,6 +40,7 @@ class UserModel {
       avatarUrl: json['avatar_url'],
       gender: json['gender'],
       birthDate: json['birth_date'],
+      points: (json['points'] ?? 0).toDouble(),
       store: json['store'] != null ? StoreModel.fromJson(json['store']) : null,
       driver: json['driver'] != null ? DriverModel.fromJson(json['driver']) : null,
     );
@@ -53,6 +56,7 @@ class UserModel {
       'avatar_url': avatarUrl,
       'gender': gender,
       'birth_date': birthDate,
+      'points': points,
     };
   }
 }

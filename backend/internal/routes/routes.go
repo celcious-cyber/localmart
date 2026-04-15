@@ -62,6 +62,20 @@ func SetupRoutes(router *gin.Engine) {
 			user.GET("/store/orders", handlers.GetStoreOrders)
 			user.PATCH("/store/orders/:id/status", handlers.UpdateOrderStatus)
 			user.POST("/upload", handlers.UploadImage)
+
+			// Favorites
+			user.GET("/favorites", handlers.GetFavorites)
+			user.POST("/favorites/:id", handlers.ToggleFavorite)
+
+			// Cart
+			user.GET("/cart", handlers.GetCart)
+			user.POST("/cart/add", handlers.AddToCart)
+			user.PUT("/cart/update/:id", handlers.UpdateCart)
+			user.DELETE("/cart/remove/:id", handlers.RemoveFromCart)
+
+			// Checkout & Orders
+			user.POST("/checkout/calculate", handlers.CalculateCheckout)
+			user.POST("/checkout/create", handlers.CreateOrder)
 		}
 
 		// ══════════════════════════════════════════════
@@ -112,6 +126,12 @@ func SetupRoutes(router *gin.Engine) {
 			admin.POST("/discovery-tabs", handlers.AdminCreateDiscoveryTab)
 			admin.PUT("/discovery-tabs/:id", handlers.AdminUpdateDiscoveryTab)
 			admin.DELETE("/discovery-tabs/:id", handlers.AdminDeleteDiscoveryTab)
+
+			// Vouchers
+			admin.GET("/vouchers", handlers.ListVouchers)
+			admin.POST("/vouchers", handlers.CreateVoucher)
+			admin.PUT("/vouchers/:id", handlers.UpdateVoucher)
+			admin.DELETE("/vouchers/:id", handlers.DeleteVoucher)
 
 			// Upload
 			admin.POST("/upload", handlers.AdminUploadImage)

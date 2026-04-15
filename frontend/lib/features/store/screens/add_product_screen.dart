@@ -96,12 +96,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _fetchData() async {
-    final cats = await _api.getCategories();
+    setState(() => _isLoading = true);
+    final cats = await _api.getCategories(type: _productType);
     if (mounted) {
       setState(() {
         _categories = cats;
         if (widget.product != null) {
-          _selectedCategory = _categories.firstWhere((c) => c.id == widget.product!.categoryId, orElse: () => _categories.first);
+          _selectedCategory = _categories.firstWhere(
+            (c) => c.id == widget.product!.categoryId, 
+            orElse: () => _categories.isNotEmpty ? _categories.first : CategoryModel(id: 0, name: 'Pilih Kategori', slug: '', iconName: '', type: 'BARANG', sortOrder: 0, isActive: true, products: [])
+          );
+        } else if (_categories.isNotEmpty) {
+           _selectedCategory = null; // Clear if adding new to prevent wrong cat
         }
         _isLoading = false;
       });

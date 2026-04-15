@@ -1,27 +1,98 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
+import '../home/controllers/sector_controller.dart';
+import '../../shared/widgets/shimmer_loading.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/models/home_data.dart';
+import '../../core/services/api_service.dart';
+import '../profile/controllers/favorites_controller.dart';
 
 class RentalScreen extends StatelessWidget {
   const RentalScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Dependency Injection with Tag
+    final SectorController controller = Get.put(
+      SectorController(moduleType: 'RENTAL'),
+      tag: 'RENTAL',
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBFB),
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context),
-          SliverToBoxAdapter(
+      body: RefreshIndicator(
+        onRefresh: () => controller.refreshData(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildSliverAppBar(context),
+            Obx(() {
+              if (controller.isLoading.value) {
+                return _buildLoadingState();
+              }
+
+              if (controller.categories.isEmpty) {
+                return SliverFillRemaining(
+                  child: EmptyState(
+                    title: 'Rental Belum Tersedia',
+                    message: 'Saat ini belum ada unit kendaraan yang terdaftar untuk disewakan.',
+                    icon: Icons.directions_car_rounded,
+                  ),
+                );
+              }
+
+              return SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSearchBar(),
+                    _buildVehicleFilters(controller.categories),
+                    _buildSectionHeader('Kendaraan Tersedia'),
+                    _buildRentalList(controller.products),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSearchBar(),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 45,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              itemCount: 4,
+              itemBuilder: (_, _) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: ShimmerLoading(
+                  child: Container(width: 80, height: 45, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchBar(),
-                _buildVehicleFilters(),
-                _buildSectionHeader('Kendaraan Tersedia'),
-                _buildRentalList(),
-                const SizedBox(height: 100),
-              ],
+              children: List.generate(2, (_) => Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: ShimmerLoading(
+                  child: Container(height: 250, width: double.infinity, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24))),
+                ),
+              )),
             ),
           ),
         ],
@@ -60,7 +131,7 @@ class RentalScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withAlpha(200),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -100,7 +171,7 @@ class RentalScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.05),
+              color: AppColors.primary.withAlpha(12),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -119,22 +190,20 @@ class RentalScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVehicleFilters() {
-    final filters = [
-      {'label': 'Semua', 'icon': Icons.grid_view},
-      {'label': 'Mobil', 'icon': Icons.directions_car},
-      {'label': 'Motor', 'icon': Icons.directions_bike},
-      {'label': 'Truck', 'icon': Icons.local_shipping},
-    ];
-
+  Widget _buildVehicleFilters(List<CategoryModel> categories) {
     return SizedBox(
       height: 45,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 15),
-        itemCount: filters.length,
+        itemCount: categories.length + 1,
         itemBuilder: (context, index) {
-          final isSelected = index == 0;
+          final isAll = index == 0;
+          final isSelected = isAll; // For now default to All
+          
+          String label = isAll ? 'Semua' : categories[index - 1].name;
+          IconData icon = isAll ? Icons.grid_view : _getRentalIcon(categories[index -1].iconName);
+
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 5),
             child: Container(
@@ -142,14 +211,14 @@ class RentalScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withValues(alpha: 0.1)),
+                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withAlpha(25)),
               ),
               child: Row(
                 children: [
-                  Icon(filters[index]['icon'] as IconData, size: 16, color: isSelected ? Colors.white : Colors.grey),
+                  Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    filters[index]['label'] as String,
+                    label,
                     style: GoogleFonts.manrope(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -165,6 +234,16 @@ class RentalScreen extends StatelessWidget {
     );
   }
 
+  IconData _getRentalIcon(String name) {
+    switch (name) {
+      case 'directions_car': return Icons.directions_car;
+      case 'directions_bike': return Icons.directions_bike;
+      case 'local_shipping': return Icons.local_shipping;
+      case 'bus_alert': return Icons.bus_alert;
+      default: return Icons.car_rental;
+    }
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
@@ -175,20 +254,17 @@ class RentalScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRentalList() {
-    final rentals = [
-      {'name': 'Avanza Veloz 2023', 'type': 'Mobil', 'price': 'Rp 350.000', 'specs': '7 Seat • Manual', 'distance': '1.5 km', 'rating': '4.9', 'img': 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=500'},
-      {'name': 'Honda Vario 160', 'type': 'Motor', 'price': 'Rp 80.000', 'specs': 'Matic • 2022', 'distance': '0.5 km', 'rating': '4.8', 'img': 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?q=80&w=500'},
-      {'name': 'Innova Reborn', 'type': 'Mobil', 'price': 'Rp 600.000', 'specs': '7 Seat • Matic', 'distance': '2.1 km', 'rating': '5.0', 'img': 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=500'},
-    ];
+  Widget _buildRentalList(List<ProductModel> products) {
+    final ApiService api = ApiService();
+    final FavoritesController favCtrl = Get.find<FavoritesController>();
 
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: rentals.length,
+      itemCount: products.length,
       itemBuilder: (context, index) {
-        final r = rentals[index];
+        final p = products[index];
         return Container(
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
@@ -196,7 +272,7 @@ class RentalScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withAlpha(12),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -205,9 +281,51 @@ class RentalScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                child: Image.network(r['img']!, height: 180, width: double.infinity, fit: BoxFit.cover),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: AspectRatio(
+                      aspectRatio: 1.6,
+                      child: Image.network(
+                        api.getImageUrl(p.imageUrl),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Obx(() {
+                      final isFav = favCtrl.isFavorited(p.id);
+                      return GestureDetector(
+                        onTap: () => favCtrl.toggleFavorite(p),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                            color: isFav ? Colors.red : Colors.grey[400],
+                            size: 20,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -217,27 +335,32 @@ class RentalScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(r['name']!, style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(p.name, style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
                         Row(
                           children: [
                             const Icon(Icons.star_rounded, color: Colors.orange, size: 18),
                             const SizedBox(width: 4),
-                            Text(r['rating']!, style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text(p.rating.toString(), style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.near_me_rounded, color: AppColors.primary, size: 14),
-                            const SizedBox(width: 4),
-                            Text(r['distance']!, style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                            const SizedBox(width: 8),
-                            Text(r['specs']!, style: GoogleFonts.manrope(fontSize: 13, color: Colors.grey)),
-                          ],
+                        const Icon(Icons.star_outline_rounded, color: AppColors.primary, size: 14),
+                        const SizedBox(width: 4),
+                        Text('${p.sold}x Disewa', style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            p.description,
+                            style: GoogleFonts.manrope(fontSize: 12, color: Colors.grey),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -248,7 +371,7 @@ class RentalScreen extends StatelessWidget {
                         RichText(
                           text: TextSpan(
                             children: [
-                              TextSpan(text: r['price']!, style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                              TextSpan(text: 'Rp ${p.price.toInt()}', style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
                               TextSpan(text: ' / hari', style: GoogleFonts.manrope(fontSize: 12, color: Colors.grey)),
                             ],
                           ),

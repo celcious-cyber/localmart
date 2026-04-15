@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../home/home_screen.dart';
 import '../auth/widgets/auth_utils.dart';
 import '../auth/screens/login_screen.dart';
@@ -80,18 +81,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
+    if (!mounted) return;
     setState(() => _isProfileLoading = true);
-    final user = await ApiService().getProfile();
-    if (mounted) {
-      setState(() {
-        _user = user;
-        _isProfileLoading = false;
-        if (user == null) {
+    
+    try {
+      final user = await ApiService().getProfile();
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _isProfileLoading = false;
+          
+          if (user == null) {
+            // Jika getProfile return null, kemungkinan sesi habis
+            AuthUtils.isLoggedIn = false;
+          } else if (user.store != null) {
+            _loadStoreDashboard();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProfileLoading = false;
           AuthUtils.isLoggedIn = false;
-        } else if (user.store != null) {
-          _loadStoreDashboard();
-        }
-      });
+          _user = null;
+        });
+      }
     }
   }
 
@@ -434,10 +449,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _buildStatItem(
                       'Local Point',
-                      '1.250',
+                      _isProfileLoading 
+                        ? '...' 
+                        : (_user?.points.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]}.") ?? '0'),
                       Icons.stars_outlined,
                       AppColors.primary,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PointsScreen())),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PointsScreen())).then((_) => _loadUserData()),
                     ),
                     const SizedBox(width: 15),
                     _buildStatItem(
@@ -538,6 +555,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not launch $url');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membuka halaman: $urlString', style: GoogleFonts.poppins()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title.toUpperCase(),
+          style: GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: Colors.grey[600],
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMenuSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -559,17 +612,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<Widget> _buildBuyerMenuList() {
     return [
+      _buildSectionHeader('Aktivitas Saya'),
       _buildMenuItem(Icons.shopping_bag_outlined, 'Pesanan Saya', 'Status pesanan belanjaan Anda', AppColors.primary, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersScreen()));
       }),
       _buildMenuItem(Icons.favorite_border, 'Favorit', 'Produk UMKM tersimpan', Colors.pink, onTapCallback: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const FavoritesScreen()));
+        Navigator.push(context, MaterialPageRoute(builder: (context) => FavoritesScreen()));
       }),
-      _buildMenuItem(Icons.location_on_outlined, 'Alamat Pengiriman', 'Tempat tinggal atau kost Anda', Colors.green, onTapCallback: () {
+      _buildMenuItem(Icons.location_on_outlined, 'Alamat Pengiriman', 'Tempat tinggal atau kost Anda', Colors.green, isLast: true, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const ShippingAddressScreen()));
       }),
+
+      _buildSectionHeader('Pusat Bantuan & Info'),
       _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan & Laporan', 'Pusat bantuan pelanggan', Colors.purple, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpSupportScreen()));
+      }),
+      _buildMenuItem(Icons.info_outline_rounded, 'Tentang LocalMart', 'Kenali lebih dekat platform kami', Colors.blue, onTapCallback: () => _launchUrl('https://localmart.id/tentang')),
+      _buildMenuItem(Icons.description_outlined, 'Syarat & Ketentuan', 'Aturan penggunaan layanan', Colors.orange, onTapCallback: () => _launchUrl('https://localmart.id/snk')),
+      _buildMenuItem(Icons.privacy_tip_outlined, 'Kebijakan Privasi', 'Bagaimana kami menjaga data Anda', Colors.teal, onTapCallback: () => _launchUrl('https://localmart.id/privacy')),
+      _buildMenuItem(Icons.share_outlined, 'Ajak Teman', 'Bagikan keseruan belanja LocalMart', Colors.indigo, isLast: true, onTapCallback: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fitur referral segera hadir!', style: GoogleFonts.poppins())),
+        );
+      }),
+
+      _buildSectionHeader('Pengaturan Akun'),
+      _buildMenuItem(Icons.security_outlined, 'Keamanan Akun', 'Password, PIN & Verifikasi', Colors.blueGrey, onTapCallback: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Menu keamanan segera hadir!', style: GoogleFonts.poppins())),
+        );
       }),
       if (AuthUtils.isLoggedIn)
         _buildMenuItem(Icons.logout, 'Keluar', 'Akhiri sesi belanja', Colors.red, isLast: true, onTapCallback: _handleLogout)
@@ -586,6 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<Widget> _buildSellerMenuList() {
     return [
+      _buildSectionHeader('Kelola Toko'),
       _buildMenuItem(Icons.inventory_2_outlined, 'Produk Saya', 'Kelola barang jualan Anda', Colors.orange, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const MyProductsScreen()));
       }),
@@ -595,15 +667,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildMenuItem(Icons.analytics_outlined, 'Statistik Performa', 'Pantau kemajuan penjualan', Colors.teal, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreStatsScreen()));
       }),
-      _buildMenuItem(Icons.storefront_outlined, 'Pengaturan Toko', 'Ubah profil dan jam operasional', Colors.indigo, onTapCallback: () {
+      _buildMenuItem(Icons.storefront_outlined, 'Pengaturan Toko', 'Ubah profil dan jam operasional', Colors.indigo, isLast: true, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const MyStoreScreen()));
       }),
+
+      _buildSectionHeader('Pusat Bantuan & Info'),
+      _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan Center', 'Pusat bantuan penjual', Colors.purple, onTapCallback: () {}),
+      _buildMenuItem(Icons.info_outline_rounded, 'Panduan Berjualan', 'Tips jualan laris di LocalMart', Colors.blue, isLast: true, onTapCallback: () {}),
+
+      _buildSectionHeader('Pengaturan Akun'),
       _buildMenuItem(Icons.logout, 'Keluar', 'Akhiri sesi jualan', Colors.red, isLast: true, onTapCallback: _handleLogout),
     ];
   }
 
   List<Widget> _buildDriverMenuList() {
     return [
+      _buildSectionHeader('Status & Order'),
       _buildMenuItem(
         Icons.power_settings_new,
         isDriverOnline ? 'Status: Online' : 'Status: Offline',
@@ -617,15 +696,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onChanged: (v) => setState(() => isDriverOnline = v),
         ),
       ),
-      _buildMenuItem(Icons.directions_run_outlined, 'Pesanan Pengantaran', 'Daftar orderan kurir/ojek', Colors.indigo, onTapCallback: () {
+      _buildMenuItem(Icons.directions_run_outlined, 'Pesanan Pengantaran', 'Daftar orderan kurir/ojek', Colors.indigo, isLast: true, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const FindOrdersScreen()));
       }),
+
+      _buildSectionHeader('Kelola Kendaraan'),
       _buildMenuItem(Icons.account_balance_wallet_outlined, 'Dompet Pendapatan', 'Cek dan tarik saldo penghasilan', Colors.blueGrey, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverWalletScreen()));
       }),
-      _buildMenuItem(Icons.motorcycle_outlined, 'Info Kendaraan', 'Atur detail plat dan jenis motor', Colors.teal, onTapCallback: () {
+      _buildMenuItem(Icons.motorcycle_outlined, 'Info Kendaraan', 'Atur detail plat dan jenis motor', Colors.teal, isLast: true, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const VehicleSettingsScreen()));
       }),
+
+      _buildSectionHeader('Pengaturan Akun'),
       _buildMenuItem(Icons.logout, 'Keluar', 'Akhiri sesi driver', Colors.red, isLast: true, onTapCallback: _handleLogout),
     ];
   }

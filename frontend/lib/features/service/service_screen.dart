@@ -1,28 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
+import '../home/controllers/sector_controller.dart';
+import '../../shared/widgets/shimmer_loading.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/models/home_data.dart';
+import '../../core/services/api_service.dart';
+import '../profile/controllers/favorites_controller.dart';
 
 class ServiceScreen extends StatelessWidget {
   const ServiceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Dependency Injection with Tag
+    final SectorController controller = Get.put(
+      SectorController(moduleType: 'JASA'),
+      tag: 'JASA',
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBFB),
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchBar(),
-                _buildCategories(),
-                _buildSectionHeader('Layanan Populer'),
-                _buildServiceGrid(),
-                const SizedBox(height: 100),
-              ],
+      body: RefreshIndicator(
+        onRefresh: () => controller.refreshData(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildSliverAppBar(context),
+            Obx(() {
+              if (controller.isLoading.value) {
+                return _buildLoadingState();
+              }
+
+              if (controller.categories.isEmpty) {
+                return SliverFillRemaining(
+                  child: EmptyState(
+                    title: 'Layanan Belum Tersedia',
+                    message: 'Saat ini belum ada penyedia jasa yang terdaftar di kategori ini.',
+                    icon: Icons.handyman_rounded,
+                  ),
+                );
+              }
+
+              return SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSearchBar(),
+                    _buildCategories(controller.categories),
+                    _buildSectionHeader('Layanan Populer'),
+                    _buildServiceGrid(controller.products),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSearchBar(),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              itemCount: 5,
+              itemBuilder: (_, _) => ShimmerLoading.categoryItem(),
             ),
+          ),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: ShimmerLoading(
+              child: Container(width: 150, height: 20, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: 4,
+            itemBuilder: (_, _) => ShimmerLoading.productCard(),
           ),
         ],
       ),
@@ -68,7 +143,7 @@ class ServiceScreen extends StatelessWidget {
                 'Taliwang, KSB',
                 style: GoogleFonts.manrope(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withAlpha(200),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -112,7 +187,7 @@ class ServiceScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.05),
+              color: AppColors.primary.withAlpha(12),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -131,15 +206,7 @@ class ServiceScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCategories() {
-    final categories = [
-      {'label': 'Peralatan', 'icon': Icons.settings_remote},
-      {'label': 'Kebersihan', 'icon': Icons.cleaning_services},
-      {'label': 'Bangunan', 'icon': Icons.construction},
-      {'label': 'Elektronik', 'icon': Icons.electrical_services},
-      {'label': 'Laundry', 'icon': Icons.local_laundry_service},
-    ];
-
+  Widget _buildCategories(List<CategoryModel> categories) {
     return SizedBox(
       height: 100,
       child: ListView.builder(
@@ -147,6 +214,7 @@ class ServiceScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 15),
         itemCount: categories.length,
         itemBuilder: (context, index) {
+          final cat = categories[index];
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 5),
             child: Column(
@@ -158,21 +226,21 @@ class ServiceScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.05),
+                        color: AppColors.primary.withAlpha(12),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Icon(
-                    categories[index]['icon'] as IconData,
+                    _getServiceIcon(cat.iconName),
                     color: AppColors.primary,
                     size: 24,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  categories[index]['label'] as String,
+                  cat.name,
                   style: GoogleFonts.manrope(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -184,6 +252,17 @@ class ServiceScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  IconData _getServiceIcon(String name) {
+    switch (name) {
+      case 'cleaning_services': return Icons.cleaning_services;
+      case 'construction': return Icons.construction;
+      case 'electrical_services': return Icons.electrical_services;
+      case 'local_laundry_service': return Icons.local_laundry_service;
+      case 'handyman': return Icons.handyman;
+      default: return Icons.handshake_outlined;
+    }
   }
 
   Widget _buildSectionHeader(String title) {
@@ -212,42 +291,10 @@ class ServiceScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildServiceGrid() {
-    final services = [
-      {
-        'name': 'Solusi Listrik KSB',
-        'price': 'Rp 50.000',
-        'rating': '4.9',
-        'distance': '0.8 km',
-        'image':
-            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400',
-      },
-      {
-        'name': 'Cuci AC Taliwang',
-        'price': 'Rp 75.000',
-        'rating': '4.8',
-        'distance': '1.2 km',
-        'image':
-            'https://plus.unsplash.com/premium_photo-1682126009570-3fe2399162f7?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      },
-      {
-        'name': 'Servis Mesin Pompa',
-        'price': 'Rp 40.000',
-        'rating': '4.7',
-        'distance': '2.5 km',
-        'image':
-            'https://images.unsplash.com/photo-1615906655593-ad0386982a0f?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      },
-      {
-        'name': 'Cuci Karpet',
-        'price': 'Rp 15.000',
-        'rating': '4.8',
-        'distance': '3.0 km',
-        'image':
-            'https://images.unsplash.com/photo-1745127262997-214698891f3c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      },
-    ];
-
+  Widget _buildServiceGrid(List<ProductModel> products) {
+    final ApiService api = ApiService();
+    final FavoritesController favCtrl = Get.find<FavoritesController>();
+    
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -258,16 +305,16 @@ class ServiceScreen extends StatelessWidget {
         mainAxisSpacing: 15,
         childAspectRatio: 0.8,
       ),
-      itemCount: services.length,
+      itemCount: products.length,
       itemBuilder: (context, index) {
-        final s = services[index];
+        final p = products[index];
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withAlpha(12),
                 blurRadius: 15,
                 offset: const Offset(0, 8),
               ),
@@ -276,33 +323,51 @@ class ServiceScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    child: AspectRatio(
+                      aspectRatio: 1.4,
+                      child: Image.network(
+                        api.getImageUrl(p.imageUrl),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                    child: Image.network(
-                      s['image']!,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(
-                            child: Icon(
-                              Icons.handshake_outlined,
-                              size: 40,
-                              color: AppColors.primary,
-                            ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Obx(() {
+                      final isFav = favCtrl.isFavorited(p.id);
+                      return GestureDetector(
+                        onTap: () => favCtrl.toggleFavorite(p),
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                              ),
+                            ],
                           ),
-                    ),
+                          child: Icon(
+                            isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                            color: isFav ? Colors.red : Colors.grey[400],
+                            size: 16,
+                          ),
+                        ),
+                      );
+                    }),
                   ),
-                ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -310,12 +375,10 @@ class ServiceScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      s['name']!,
-                      style: GoogleFonts.epilogue(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      p.name,
+                      style: GoogleFonts.epilogue(fontSize: 13, fontWeight: FontWeight.bold),
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -323,49 +386,21 @@ class ServiceScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(
-                              Icons.near_me_rounded,
-                              color: AppColors.primary,
-                              size: 12,
-                            ),
+                            const Icon(Icons.star_rounded, color: Colors.orange, size: 18),
                             const SizedBox(width: 4),
-                            Text(
-                              s['distance']!,
-                              style: GoogleFonts.manrope(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                            Text(p.rating.toString(), style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: Colors.orange,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              s['rating']!,
-                              style: GoogleFonts.manrope(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '${p.sold} Terjual',
+                          style: GoogleFonts.manrope(fontSize: 10, color: Colors.grey),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      s['price']!,
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
+                      'Rp ${p.price.toInt()}',
+                      style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
                     ),
                   ],
                 ),

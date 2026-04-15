@@ -115,13 +115,13 @@ func seedData(db *gorm.DB) {
 		// Simple clean start for categories
 		db.Exec("DELETE FROM categories")
 		categories := []Category{
-			{Name: "Hasil Bumi", Slug: "hasil-bumi", IconName: "agriculture", SortOrder: 1, IsActive: true},
-			{Name: "Pangan Lokal", Slug: "pangan-lokal", IconName: "restaurant", SortOrder: 2, IsActive: true},
-			{Name: "Kerajinan UMKM", Slug: "kerajinan-umkm", IconName: "brush", SortOrder: 3, IsActive: true},
-			{Name: "Sewa & Rental", Slug: "sewa-rental", IconName: "car_rental", SortOrder: 4, IsActive: true},
-			{Name: "Wisata Lokal", Slug: "wisata-lokal", IconName: "tour", SortOrder: 5, IsActive: true},
-			{Name: "Jasa Ahli", Slug: "jasa-ahli", IconName: "handyman", SortOrder: 6, IsActive: true},
-			{Name: "Elektronik", Slug: "elektronik", IconName: "devices", SortOrder: 7, IsActive: true},
+			{Name: "Hasil Bumi", Slug: "hasil-bumi", IconName: "agriculture", SortOrder: 1, Type: "BARANG", IsActive: true},
+			{Name: "Pangan Lokal", Slug: "pangan-lokal", IconName: "restaurant", SortOrder: 2, Type: "BARANG", IsActive: true},
+			{Name: "Kerajinan UMKM", Slug: "kerajinan-umkm", IconName: "brush", SortOrder: 3, Type: "BARANG", IsActive: true},
+			{Name: "Sewa & Rental", Slug: "sewa-rental", IconName: "car_rental", SortOrder: 4, Type: "RENTAL", IsActive: true},
+			{Name: "Wisata Lokal", Slug: "wisata-lokal", IconName: "tour", SortOrder: 5, Type: "WISATA", IsActive: true},
+			{Name: "Jasa Ahli", Slug: "jasa-ahli", IconName: "handyman", SortOrder: 6, Type: "JASA", IsActive: true},
+			{Name: "Elektronik", Slug: "elektronik", IconName: "devices", SortOrder: 7, Type: "BARANG", IsActive: true},
 		}
 		db.Create(&categories)
 		log.Println("Seed: Categories (Localized) dibuat")

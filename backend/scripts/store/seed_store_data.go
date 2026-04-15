@@ -59,7 +59,7 @@ func main() {
 			orderItems = append(orderItems, models.OrderItem{
 				ProductID: p.ID,
 				Quantity:  qty,
-				Price:     p.Price,
+				PriceAtPurchase: p.Price,
 			})
 			totalAmount += p.Price * float64(qty)
 			

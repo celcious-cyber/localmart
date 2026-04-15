@@ -463,3 +463,59 @@ func AdminDashboardStats(c *gin.Context) {
 		},
 	})
 }
+// ══════════════════════════════════════════════════════════════
+// VOUCHER MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+// ListVouchers - GET /api/v1/admin/vouchers
+func ListVouchers(c *gin.Context) {
+	var vouchers []models.Voucher
+	if err := config.DB.Order("created_at desc").Find(&vouchers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal mengambil voucher"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": vouchers})
+}
+
+// CreateVoucher - POST /api/v1/admin/vouchers
+func CreateVoucher(c *gin.Context) {
+	var voucher models.Voucher
+	if err := c.ShouldBindJSON(&voucher); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid"})
+		return
+	}
+
+	if err := config.DB.Create(&voucher).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal membuat voucher"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": voucher})
+}
+
+// UpdateVoucher - PUT /api/v1/admin/vouchers/:id
+func UpdateVoucher(c *gin.Context) {
+	id := c.Param("id")
+	var voucher models.Voucher
+	if err := config.DB.First(&voucher, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Voucher tidak ditemukan"})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&voucher); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid"})
+		return
+	}
+
+	config.DB.Save(&voucher)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": voucher})
+}
+
+// DeleteVoucher - DELETE /api/v1/admin/vouchers/:id
+func DeleteVoucher(c *gin.Context) {
+	id := c.Param("id")
+	if err := config.DB.Delete(&models.Voucher{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal menghapus voucher"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Voucher berhasil dihapus"})
+}

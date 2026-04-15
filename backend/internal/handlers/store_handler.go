@@ -195,6 +195,17 @@ func CreateStoreProduct(c *gin.Context) {
 		Height:      height,
 	}
 
+	// Category-Type Validation
+	var category models.Category
+	if err := config.DB.First(&category, product.CategoryID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Kategori tidak ditemukan"})
+		return
+	}
+	if category.Type != product.ProductType {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": fmt.Sprintf("Kategori %s tidak cocok dengan tipe produk %s", category.Name, product.ProductType)})
+		return
+	}
+
 	// 2. Parse Variants (JSON String)
 	variantsJSON := c.PostForm("variants")
 	if variantsJSON != "" && variantsJSON != "[]" {
@@ -294,6 +305,17 @@ func UpdateStoreProduct(c *gin.Context) {
 	product.Length = length
 	product.Width = width
 	product.Height = height
+
+	// Category-Type Validation
+	var category models.Category
+	if err := config.DB.First(&category, product.CategoryID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Kategori tidak ditemukan"})
+		return
+	}
+	if category.Type != product.ProductType {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": fmt.Sprintf("Kategori %s tidak cocok dengan tipe produk %s", category.Name, product.ProductType)})
+		return
+	}
 
 	// 2. Parse Variants & Existing Images
 	var variants []models.ProductVariant

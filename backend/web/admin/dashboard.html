@@ -6,7 +6,7 @@
     <title>LocalMart | Admin Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="/admin/css/admin.css?v=2.0.1">
 </head>
 <body class="dashboard-page">
     <!-- Sidebar -->
@@ -16,38 +16,43 @@
         </div>
         <ul class="nav-links">
             <li class="nav-item">
-                <a href="#" class="nav-link active" data-target="overview">
+                <a href="/admin/overview" class="nav-link active" data-target="overview">
                     <i class="material-icons">dashboard</i> Overview
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="banners">
+                <a href="/admin/banners" class="nav-link" data-target="banners">
                     <i class="material-icons">view_carousel</i> Banners
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="categories">
+                <a href="/admin/categories" class="nav-link" data-target="categories">
                     <i class="material-icons">category</i> Categories
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="products">
+                <a href="/admin/products" class="nav-link" data-target="products">
                     <i class="material-icons">shopping_bag</i> Products
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="stores">
+                <a href="/admin/stores" class="nav-link" data-target="stores">
                     <i class="material-icons">store</i> Stores
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="drivers">
+                <a href="/admin/drivers" class="nav-link" data-target="drivers">
                     <i class="material-icons">local_shipping</i> Drivers
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#" class="nav-link" data-target="sections">
+                <a href="/admin/sections" class="nav-link" data-target="sections">
                     <i class="material-icons">settings_overscan</i> UI Sections
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/vouchers" class="nav-link" data-target="vouchers">
+                    <i class="material-icons">confirmation_number</i> Vouchers
                 </a>
             </li>
         </ul>
@@ -134,6 +139,7 @@
                             <th>Icon</th>
                             <th>Name</th>
                             <th>Slug</th>
+                            <th>Type</th>
                             <th>Order</th>
                             <th>Actions</th>
                         </tr>
@@ -229,6 +235,29 @@
                 </table>
             </div>
         </section>
+
+        <!-- Vouchers Section -->
+        <section id="vouchers" class="cms-section" style="display: none;">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Voucher Management</h3>
+                    <button class="action-btn" onclick="openVoucherModal()">+ Add Voucher</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Type</th>
+                            <th>Value</th>
+                            <th>Min Order</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="voucherList"></tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
     <!-- Modals (Simplified versions) -->
@@ -285,6 +314,15 @@
                     <input type="text" id="c_icon_name" placeholder="shopping_cart" required>
                 </div>
                 <div class="form-group">
+                    <label>Category Type</label>
+                    <select id="c_type" style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <option value="BARANG">BARANG (Fisik)</option>
+                        <option value="JASA">JASA (Layanan)</option>
+                        <option value="RENTAL">RENTAL (Sewa)</option>
+                        <option value="WISATA">WISATA (Trip/Tour)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Sort Order</label>
                     <input type="number" id="c_order" value="0">
                 </div>
@@ -332,15 +370,46 @@
         </div>
     </div>
 
-    <script src="js/admin.js"></script>
+    <script src="/admin/js/admin.js?v=2.0.1"></script>
     <script>
         // Check Auth
         if (!localStorage.getItem('admin_token')) {
-            window.location.href = 'index.html';
+            window.location.href = '/admin/index.html';
         }
 
         function closeModals() {
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        }
+
+        // --- Modals Opener (With ID Lookups) ---
+        function openBannerModalById(id) {
+            const data = (window.allBanners || []).find(b => b.id == id);
+            openBannerModal(data);
+        }
+
+        function openCategoryModalById(id) {
+            const data = (window.allCategories || []).find(c => c.id == id);
+            openCategoryModal(data);
+        }
+
+        function openProductModalById(id) {
+            const data = (window.allProducts || []).find(p => p.id == id);
+            openProductModal(data);
+        }
+
+        function openStoreModalById(id) {
+            const data = (window.allStores || []).find(s => s.id == id);
+            openStoreModal(data);
+        }
+
+        function openDriverModalById(id) {
+            const data = (window.allDrivers || []).find(d => d.id == id);
+            openDriverModal(data);
+        }
+
+        function openSectionModalById(id) {
+            const data = (window.allSections || []).map(s => s).find(s => s.id == id);
+            openSectionModal(data);
         }
 
         // --- Modals Opener ---
@@ -367,6 +436,7 @@
                 document.getElementById('c_name').value = data.name;
                 document.getElementById('c_slug').value = data.slug;
                 document.getElementById('c_icon_name').value = data.icon_name;
+                document.getElementById('c_type').value = data.type || 'BARANG';
                 document.getElementById('c_order').value = data.sort_order;
             } else { document.getElementById('categoryId').value = ''; }
             modal.style.display = 'flex';
@@ -388,6 +458,38 @@
             modal.style.display = 'flex';
         }
 
+        async function fetchVouchers() {
+            const data = await fetchData('vouchers');
+            const list = document.getElementById('voucherList');
+            list.innerHTML = data.map(v => `
+                <tr>
+                    <td><strong>${v.code}</strong></td>
+                    <td><span class="badge ${v.type === 'PERCENT' ? 'badge-blue' : 'badge-green'}">${v.type}</span></td>
+                    <td>${v.type === 'PERCENT' ? v.value + '%' : 'Rp ' + v.value.toLocaleString()}</td>
+                    <td>Rp ${v.min_order.toLocaleString()}</td>
+                    <td><span class="badge ${v.is_active ? 'badge-success' : 'badge-danger'}">${v.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td class="table-actions">
+                        <button class="action-btn edit" onclick='openVoucherModal(${JSON.stringify(v)})'>Edit</button>
+                        <button class="action-btn delete" onclick="deleteItem('vouchers', ${v.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openVoucherModal(data = null) {
+            const modal = document.getElementById('voucherModal');
+            document.getElementById('voucherForm').reset();
+            if (data) {
+                document.getElementById('voucherId').value = data.id;
+                document.getElementById('v_code').value = data.code;
+                document.getElementById('v_type').value = data.type;
+                document.getElementById('v_value').value = data.value;
+                document.getElementById('v_min_order').value = data.min_order;
+                document.getElementById('v_max_discount').value = data.max_discount;
+            } else { document.getElementById('voucherId').value = ''; }
+            modal.style.display = 'flex';
+        }
+
         // --- Forms Submission ---
         document.getElementById('bannerForm').onsubmit = (e) => submitForm(e, 'bannerId', 'banners', {
             title: document.getElementById('b_title').value,
@@ -401,6 +503,7 @@
             name: document.getElementById('c_name').value,
             slug: document.getElementById('c_slug').value,
             icon_name: document.getElementById('c_icon_name').value,
+            type: document.getElementById('c_type').value,
             sort_order: parseInt(document.getElementById('c_order').value),
             is_active: true
         });
@@ -411,6 +514,15 @@
             price: parseFloat(document.getElementById('p_price').value),
             image_url: document.getElementById('p_image_url').value,
             description: document.getElementById('p_desc').value,
+            is_active: true
+        });
+
+        document.getElementById('voucherForm').onsubmit = (e) => submitForm(e, 'voucherId', 'vouchers', {
+            code: document.getElementById('v_code').value,
+            type: document.getElementById('v_type').value,
+            value: parseFloat(document.getElementById('v_value').value),
+            min_order: parseFloat(document.getElementById('v_min_order').value),
+            max_discount: parseFloat(document.getElementById('v_max_discount').value),
             is_active: true
         });
 

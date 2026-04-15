@@ -37,6 +37,7 @@ class CategoryModel {
   final String name;
   final String slug;
   final String iconName;
+  final String type;
   final int sortOrder;
   final bool isActive;
   final List<ProductModel> products;
@@ -46,6 +47,7 @@ class CategoryModel {
     required this.name,
     required this.slug,
     required this.iconName,
+    required this.type,
     required this.sortOrder,
     required this.isActive,
     required this.products,
@@ -57,6 +59,7 @@ class CategoryModel {
       name: json['name'] ?? '',
       slug: json['slug'] ?? '',
       iconName: json['icon_name'] ?? '',
+      type: json['type'] ?? 'BARANG',
       sortOrder: json['sort_order'] ?? 0,
       isActive: json['is_active'] ?? true,
       products: (json['products'] as List?)
@@ -332,6 +335,43 @@ class HomeResponseModel {
               ?.map((t) => DiscoveryTabModel.fromJson(t))
               .toList() ??
           [],
+    );
+  }
+}
+
+class CartItemModel {
+  final int id;
+  final int userId;
+  final int productId;
+  final int? variantId;
+  final int quantity;
+  final DateTime createdAt;
+  final ProductModel? product;
+  final ProductVariantModel? variant;
+
+  CartItemModel({
+    required this.id,
+    required this.userId,
+    required this.productId,
+    this.variantId,
+    required this.quantity,
+    required this.createdAt,
+    this.product,
+    this.variant,
+  });
+
+  factory CartItemModel.fromJson(Map<String, dynamic> json) {
+    return CartItemModel(
+      id: json['id'] ?? 0,
+      userId: json['user_id'] ?? 0,
+      productId: json['product_id'] ?? 0,
+      variantId: json['variant_id'],
+      quantity: json['quantity'] ?? 1,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']) 
+          : DateTime.now(),
+      product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
+      variant: json['variant'] != null ? ProductVariantModel.fromJson(json['variant']) : null,
     );
   }
 }

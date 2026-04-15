@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:get/get.dart';
 import 'features/home/home_screen.dart';
 import 'core/theme/app_colors.dart';
 import 'core/services/api_service.dart';
@@ -20,7 +21,7 @@ class LocalMartApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
       title: 'LocalMart KSB',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -33,7 +34,11 @@ class LocalMartApp extends StatelessWidget {
         ),
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const HomeScreen(),
+      initialRoute: '/',
+      getPages: [
+        GetPage(name: '/', page: () => const HomeScreen()),
+        GetPage(name: '/home', page: () => const HomeScreen()),
+      ],
     );
   }
 }

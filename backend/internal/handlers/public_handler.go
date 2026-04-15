@@ -19,6 +19,11 @@ type HomeResponse struct {
 
 // GetHomeData mengembalikan semua data homepage dalam satu request
 func GetHomeData(c *gin.Context) {
+	typeParam := c.Query("type")
+	if typeParam == "" {
+		typeParam = "BARANG" // Default ke barang fisik untuk discovery utama
+	}
+
 	var banners []models.Banner
 	var sliders []models.Banner
 	var categories []models.Category
@@ -35,9 +40,11 @@ func GetHomeData(c *gin.Context) {
 		Order("sort_order ASC").
 		Find(&sliders)
 
-	// Categories dengan products (aktif, urut)
-	config.DB.Where("is_active = ?", true).
+	// Categories dengan products sesuai Tipe (aktif, urut)
+	config.DB.Where("is_active = ? AND type = ?", true, typeParam).
 		Order("sort_order ASC").
+		Preload("Products.Images").
+		Preload("Products.Store").
 		Preload("Products", "is_active = ?", true).
 		Find(&categories)
 
@@ -50,6 +57,19 @@ func GetHomeData(c *gin.Context) {
 	config.DB.Where("is_active = ?", true).
 		Order("sort_order ASC").
 		Find(&discoveryTabs)
+	
+	// Inject Mock Data for UI High-Fidelity
+	for i := range categories {
+		for j := range categories[i].Products {
+			categories[i].Products[j].Rating = 4.8
+			categories[i].Products[j].ReviewCount = 150
+			if categories[i].Products[j].Store != nil {
+				categories[i].Products[j].Store.Rating = 4.0
+				categories[i].Products[j].Store.ReviewCount = 38
+				categories[i].Products[j].Store.ProductCount = 20
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -80,11 +100,31 @@ func GetBanners(c *gin.Context) {
 
 // GetCategories mengembalikan list kategori aktif + produknya
 func GetCategories(c *gin.Context) {
+	typeParam := c.Query("type")
+	if typeParam == "" {
+		typeParam = "BARANG"
+	}
+
 	var categories []models.Category
-	config.DB.Where("is_active = ?", true).
+	config.DB.Where("is_active = ? AND type = ?", true, typeParam).
 		Order("sort_order ASC").
+		Preload("Products.Images").
 		Preload("Products", "is_active = ?", true).
+		Preload("Products.Store").
 		Find(&categories)
+	
+	// Inject Mock Data
+	for i := range categories {
+		for j := range categories[i].Products {
+			categories[i].Products[j].Rating = 4.8
+			categories[i].Products[j].ReviewCount = 150
+			if categories[i].Products[j].Store != nil {
+				categories[i].Products[j].Store.Rating = 4.0
+				categories[i].Products[j].Store.ReviewCount = 38
+				categories[i].Products[j].Store.ProductCount = 20
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -98,8 +138,21 @@ func GetProductsByCategory(c *gin.Context) {
 
 	var category models.Category
 	result := config.DB.Where("slug = ? AND is_active = ?", slug, true).
+		Preload("Products.Images").
 		Preload("Products", "is_active = ?", true).
+		Preload("Products.Store").
 		First(&category)
+	
+	// Inject Mock Data
+	for i := range category.Products {
+		category.Products[i].Rating = 4.8
+		category.Products[i].ReviewCount = 150
+		if category.Products[i].Store != nil {
+			category.Products[i].Store.Rating = 4.0
+			category.Products[i].Store.ReviewCount = 38
+			category.Products[i].Store.ProductCount = 20
+		}
+	}
 
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -149,6 +202,7 @@ func GlobalSearch(c *gin.Context) {
 
 	// Search Products
 	config.DB.Where("name LIKE ? AND is_active = ?", searchQuery, true).
+		Preload("Images").
 		Preload("Store").
 		Limit(20).
 		Find(&products)
@@ -157,6 +211,22 @@ func GlobalSearch(c *gin.Context) {
 	config.DB.Where("name LIKE ? AND is_active = ?", searchQuery, true).
 		Limit(20).
 		Find(&stores)
+	
+	// Inject Mock Data
+	for i := range products {
+		products[i].Rating = 4.8
+		products[i].ReviewCount = 150
+		if products[i].Store != nil {
+			products[i].Store.Rating = 4.0
+			products[i].Store.ReviewCount = 38
+			products[i].Store.ProductCount = 20
+		}
+	}
+	for i := range stores {
+		stores[i].Rating = 4.0
+		stores[i].ReviewCount = 38
+		stores[i].ProductCount = 20
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

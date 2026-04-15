@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/models/home_data.dart';
 import '../../shared/models/user_model.dart';
 import '../../shared/models/store_models.dart';
+import '../../features/auth/widgets/auth_utils.dart';
 
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
@@ -27,10 +28,11 @@ class ApiService {
       },
       onError: (e, handler) async {
         if (e.response?.statusCode == 401) {
-          // Token expired or invalid, clear session
+          // Token expired or invalid, clear session and global flag
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove('user_token');
           await prefs.remove('user_data');
+          AuthUtils.isLoggedIn = false;
         }
         return handler.next(e);
       },
@@ -329,16 +331,19 @@ class ApiService {
 
   // --- CONTENT METHODS ---
 
-  Future<List<CategoryModel>> getCategories() async {
+  Future<List<CategoryModel>> getCategories({String? type}) async {
     try {
-      final response = await _dio.get('/home/categories');
+      final queryParams = <String, dynamic>{};
+      if (type != null) queryParams['type'] = type;
+      
+      final response = await _dio.get('/home/categories', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return (response.data['data'] as List)
             .map((c) => CategoryModel.fromJson(c))
             .toList();
       }
     } catch (e) {
-      debugPrint('Error fetching categories: $e');
+      debugPrint('Error fetching categories ($type): $e');
     }
     return [];
   }
@@ -405,5 +410,153 @@ class ApiService {
       'products': [],
       'stores': [],
     };
+  }
+
+  // --- FAVORITE METHODS ---
+
+  Future<List<ProductModel>> getFavorites() async {
+    try {
+      final response = await _dio.get('/user/favorites');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((p) => ProductModel.fromJson(p))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching favorites: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> toggleFavorite(int productId) async {
+    try {
+      final response = await _dio.post('/user/favorites/$productId');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'is_favorited': response.data['data']['is_favorited'],
+          'message': response.data['message'],
+        };
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+    }
+    return {'success': false, 'message': 'Gagal memproses favorit'};
+  }
+
+  // --- CART METHODS ---
+
+  Future<List<CartItemModel>> getCart() async {
+    try {
+      final response = await _dio.get('/user/cart');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((c) => CartItemModel.fromJson(c))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching cart: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> addToCart({
+    required int productId,
+    int? variantId,
+    int quantity = 1,
+  }) async {
+    try {
+      final response = await _dio.post('/user/cart/add', data: {
+        'product_id': productId,
+        'variant_id': variantId,
+        'quantity': quantity,
+      });
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': response.data['message']};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal tambah ke keranjang'};
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 400) {
+        return {'success': false, 'message': e.response?.data['message'] ?? 'Stok tidak mencukupi'};
+      }
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateCart(int cartId, int quantity) async {
+    try {
+      final response = await _dio.put('/user/cart/update/$cartId', data: {'quantity': quantity});
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'data': CartItemModel.fromJson(response.data['data'])};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal update keranjang'};
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 400) {
+        return {'success': false, 'message': e.response?.data['message'] ?? 'Stok tidak mencukupi'};
+      }
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<bool> removeFromCart(int cartId) async {
+    try {
+      final response = await _dio.delete('/user/cart/remove/$cartId');
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      debugPrint('Error removing from cart: $e');
+      return false;
+    }
+  }
+
+  // --- CHECKOUT METHODS ---
+
+  Future<Map<String, dynamic>> calculateCheckout(List<Map<String, dynamic>> items, {String? voucherCode, String? shippingMethod, bool usePoints = false}) async {
+    try {
+      final response = await _dio.post('/user/checkout/calculate', data: {
+        'items': items,
+        'voucher_code': voucherCode,
+        'shipping_method': shippingMethod,
+        'use_points': usePoints,
+      });
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'data': response.data['data']};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal kalkulasi checkout'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<Map<String, dynamic>> createOrder({
+    required List<Map<String, dynamic>> items,
+    required String shippingAddress,
+    String? serviceDate,
+    String? voucherCode,
+    required String paymentMethod,
+    required String shippingMethod,
+    bool usePoints = false,
+  }) async {
+    try {
+      final response = await _dio.post('/user/checkout/create', data: {
+        'items': items,
+        'shipping_address': shippingAddress,
+        'service_date': serviceDate,
+        'voucher_code': voucherCode,
+        'payment_method': paymentMethod,
+        'shipping_method': shippingMethod,
+        'use_points': usePoints,
+      });
+
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        return {'success': true, 'data': response.data['data']};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal membuat pesanan'};
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 400) {
+        return {'success': false, 'message': e.response?.data['message'] ?? 'Stok tidak mencukupi'};
+      }
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
   }
 }

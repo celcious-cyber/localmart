@@ -24,6 +24,7 @@ type Category struct {
 	Slug      string    `gorm:"size:100;uniqueIndex;not null" json:"slug"`
 	IconName  string    `gorm:"size:100" json:"icon_name"` // nama icon Material Design
 	SortOrder int       `gorm:"default:0" json:"sort_order"`
+	Type      string    `gorm:"size:20;not null;default:'BARANG'" json:"type"` // BARANG, JASA, RENTAL, WISATA
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
 	Products  []Product `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
@@ -128,6 +129,7 @@ type User struct {
 	BirthDate string    `gorm:"size:20" json:"birth_date"` // YYYY-MM-DD
 	Latitude  float64   `gorm:"default:0" json:"latitude"`
 	Longitude float64   `gorm:"default:0" json:"longitude"`
+	Points    float64   `gorm:"default:0" json:"points"` // LocalPoints (1:1 with IDR)
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -184,17 +186,24 @@ type Driver struct {
 
 // Order - pesanan dari pembeli ke toko
 type Order struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	UserID      uint      `gorm:"not null;index" json:"user_id"`
-	StoreID     uint      `gorm:"not null;index" json:"store_id"`
-	OrderNumber string    `gorm:"size:50;uniqueIndex;not null" json:"order_number"`
-	TotalAmount float64   `gorm:"not null" json:"total_amount"`
-	Status      string    `gorm:"size:20;default:'pending'" json:"status"` // "pending", "processed", "shipping", "completed", "cancelled"
-	Address     string    `gorm:"type:text" json:"address"`
-	Latitude    float64   `gorm:"default:0" json:"latitude"`
-	Longitude   float64   `gorm:"default:0" json:"longitude"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           uint        `gorm:"primaryKey" json:"id"`
+	UserID       uint        `gorm:"not null;index" json:"user_id"`
+	StoreID      uint        `gorm:"not null;index" json:"store_id"`
+	OrderNumber     string      `gorm:"size:50;uniqueIndex;not null" json:"order_number"`
+	TotalAmount     float64     `gorm:"not null" json:"total_amount"`
+	ShippingFee     float64     `gorm:"not null;default:0" json:"shipping_fee"`
+	VoucherCode     string      `gorm:"size:50" json:"voucher_code"`
+	VoucherDiscount float64     `gorm:"default:0" json:"voucher_discount"`
+	PointDiscount   float64     `gorm:"default:0" json:"point_discount"`
+	PaymentMethod   string      `gorm:"size:50" json:"payment_method"`   // LOCALPAY, TRANSFER
+	ShippingMethod  string      `gorm:"size:50" json:"shipping_method"`  // LOCALSEND, SELF_PICKUP
+	Status          string      `gorm:"size:20;default:'PENDING'" json:"status"` // PENDING, PAID, PROCESSED, SHIPPED, COMPLETED, CANCELLED
+	Address         string      `gorm:"type:text" json:"address"`
+	Latitude     float64     `gorm:"default:0" json:"latitude"`
+	Longitude    float64     `gorm:"default:0" json:"longitude"`
+	ServiceDate  string      `gorm:"size:100" json:"service_date"` // Untuk Jasa/Rental/Wisata
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
 
 	// Associations
 	User  User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -209,18 +218,43 @@ func (Order) TableName() string {
 
 // OrderItem - item produk dalam satu pesanan
 type OrderItem struct {
-	ID        uint    `gorm:"primaryKey" json:"id"`
-	OrderID   uint    `gorm:"not null;index" json:"order_id"`
-	ProductID uint    `gorm:"not null;index" json:"product_id"`
-	Quantity  int     `gorm:"not null" json:"quantity"`
-	Price     float64 `gorm:"not null" json:"price"` // harga snapshot saat dibeli
-
+	ID              uint            `gorm:"primaryKey" json:"id"`
+	OrderID         uint            `gorm:"not null;index" json:"order_id"`
+	ProductID       uint            `gorm:"not null;index" json:"product_id"`
+	VariantID       *uint           `gorm:"index" json:"variant_id"`
+	Quantity        int             `gorm:"not null" json:"quantity"`
+	PriceAtPurchase float64         `gorm:"not null" json:"price_at_purchase"` // Snapshot harga saat checkout
+	
 	// Associations
-	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Variant *ProductVariant `gorm:"foreignKey:VariantID" json:"variant,omitempty"`
 }
 
 func (OrderItem) TableName() string {
 	return "order_items"
+}
+
+// Voucher - kupon potongan harga
+type Voucher struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Code        string    `gorm:"size:50;uniqueIndex;not null" json:"code"`
+	Type        string    `gorm:"size:20;not null" json:"type"` // "PERCENT", "FLAT"
+	Value       float64   `gorm:"not null" json:"value"`
+	MinOrder    float64   `gorm:"default:0" json:"min_order"`
+	MaxDiscount float64   `gorm:"default:0" json:"max_discount"` // Hanya untuk PERCENT
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// PointTransaction - riwayat penambahan/pengurangan poin user
+type PointTransaction struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	UserID      uint      `gorm:"not null;index" json:"user_id"`
+	Amount      float64   `gorm:"not null" json:"amount"`
+	Type        string    `gorm:"size:10;not null" json:"type"` // "EARN", "SPEND"
+	Description string    `gorm:"size:255" json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Review - ulasan produk dari pembeli
@@ -259,12 +293,14 @@ type StoreFollower struct {
 
 // CartItem - item dalam keranjang belanja
 type CartItem struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `gorm:"not null;index" json:"user_id"`
-	ProductID uint      `gorm:"not null;index" json:"product_id"`
-	Quantity  int       `gorm:"not null;default:1" json:"quantity"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uint            `gorm:"primaryKey" json:"id"`
+	UserID    uint            `gorm:"not null;index" json:"user_id"`
+	ProductID uint            `gorm:"not null;index" json:"product_id"`
+	VariantID *uint           `gorm:"index" json:"variant_id"` // Nullable for products without variants
+	Quantity  int             `gorm:"not null;default:1" json:"quantity"`
+	CreatedAt time.Time       `json:"created_at"`
 
 	// Associations
-	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product *Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Variant *ProductVariant `gorm:"foreignKey:VariantID" json:"variant,omitempty"`
 }

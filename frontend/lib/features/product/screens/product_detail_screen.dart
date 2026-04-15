@@ -5,6 +5,10 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
+import '../../profile/controllers/favorites_controller.dart';
+import '../controllers/product_detail_controller.dart';
+import '../../../shared/widgets/reactive_cart_icon.dart';
+import 'package:get/get.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final ProductModel product;
@@ -18,12 +22,20 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final ApiService _api = ApiService();
+  
+  FavoritesController get _favController => Get.isRegistered<FavoritesController>() 
+      ? Get.find<FavoritesController>() 
+      : Get.put(FavoritesController());
+  
+  ProductDetailController get _controller => Get.put(
+      ProductDetailController(product: widget.product), 
+      tag: widget.product.id.toString()
+  );
+  
   bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
-  bool _isFavorited = false;
   bool _isFollowing = false;
-  ProductVariantModel? _selectedVariant;
   Map<String, dynamic> _metadata = {};
 
   @override
@@ -156,10 +168,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           onPressed: () {},
         ),
-        IconButton(
-          icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
-          onPressed: () {},
-        ),
+        const ReactiveCartIcon(iconColor: Colors.white),
         const SizedBox(width: 8),
       ],
     );
@@ -250,23 +259,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              GestureDetector(
-                onTap: () {
-                  setState(() => _isFavorited = !_isFavorited);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(_isFavorited ? 'Ditambahkan ke Favorit' : 'Dihapus dari Favorit'),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                child: Icon(
-                  _isFavorited ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  color: _isFavorited ? Colors.red : Colors.grey[400],
-                  size: 28,
-                ),
-              ),
+              Obx(() {
+                final isFav = _favController.isFavorited(widget.product.id);
+                return GestureDetector(
+                  onTap: () => _favController.toggleFavorite(widget.product),
+                  child: Icon(
+                    isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    color: isFav ? Colors.red : Colors.grey[400],
+                    size: 28,
+                  ),
+                );
+              }),
             ],
           ),
           const SizedBox(height: 8),
@@ -287,14 +290,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            _api.formatCurrency(_selectedVariant?.price ?? widget.product.price),
+          Obx(() => Text(
+            _api.formatCurrency(_controller.selectedVariant.value?.price ?? widget.product.price),
             style: GoogleFonts.manrope(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
-          ),
+          )),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -352,46 +355,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildVariantSelector() {
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: widget.product.variants.length,
-        itemBuilder: (context, index) {
-          final variant = widget.product.variants[index];
-          bool isSelected = _selectedVariant?.id == variant.id;
+    return Obx(() {
+      return SizedBox(
+        height: 40,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: widget.product.variants.length,
+          itemBuilder: (context, index) {
+            final variant = widget.product.variants[index];
+            bool isSelected = _controller.selectedVariant.value?.id == variant.id;
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: ChoiceChip(
-              label: Text(
-                variant.name,
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.white : AppColors.textPrimary,
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: ChoiceChip(
+                label: Text(
+                  variant.name,
+                  style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                  ),
                 ),
-              ),
-              selected: isSelected,
-              selectedColor: AppColors.primary,
-              backgroundColor: Colors.grey[50],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(
-                  color: isSelected ? AppColors.primary : Colors.grey[200]!,
+                selected: isSelected,
+                selectedColor: AppColors.primary,
+                backgroundColor: Colors.grey[50],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primary : Colors.grey[200]!,
+                  ),
                 ),
+                onSelected: (selected) {
+                  if (selected) {
+                    _controller.selectVariant(variant);
+                  } else {
+                    _controller.selectedVariant.value = null;
+                  }
+                },
+                showCheckmark: false,
               ),
-              onSelected: (selected) {
-                setState(() {
-                  _selectedVariant = selected ? variant : null;
-                });
-              },
-              showCheckmark: false,
-            ),
-          );
-        },
-      ),
-    );
+            );
+          },
+        ),
+      );
+    });
   }
 
   Widget _buildDivider() {
@@ -786,127 +793,107 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  void _handleAddToCart() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Text('${widget.product.name} dimasukkan ke keranjang'),
-          ],
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'LIHAT',
-          textColor: Colors.white,
-          onPressed: () {
-            // Future: Navigate to Cart
-          },
-        ),
-      ),
-    );
-  }
 
   Widget _buildBottomAction() {
     final type = widget.product.productType;
+    
     String mainBtnLabel = 'Beli Sekarang';
-    if (type == 'JASA') mainBtnLabel = 'Pesan Jasa';
+    if (type == 'JASA') mainBtnLabel = 'Pesan Sekarang';
     if (type == 'RENTAL') mainBtnLabel = 'Sewa Sekarang';
     if (type == 'WISATA') mainBtnLabel = 'Booking Sekarang';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: _handleChat,
-              child: Container(
-                height: 50,
-                width: 50,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[200]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  color: AppColors.primary,
+    return Obx(() {
+      // Accessing observables to satisfy GetX dependency tracking
+      _controller.selectedVariant.value;
+      _controller.quantity.value;
+      final needsVariant = widget.product.variants.isNotEmpty && _controller.selectedVariant.value == null;
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _handleChat,
+                child: Container(
+                  height: 50,
+                  width: 50,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[200]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            if (type == 'BARANG') ...[
+              const SizedBox(width: 12),
+              if (type == 'BARANG') ...[
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton(
+                      onPressed: _controller.addToCart,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: needsVariant ? Colors.grey[300]! : AppColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Keranjang',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          fontWeight: FontWeight.bold,
+                          color: needsVariant ? Colors.grey[400] : AppColors.primary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
+                flex: type == 'BARANG' ? 1 : 2,
                 child: SizedBox(
                   height: 50,
-                  child: OutlinedButton(
-                    onPressed: _handleAddToCart,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primary),
+                  child: ElevatedButton(
+                    onPressed: _controller.buyNow,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: needsVariant && type == 'BARANG' ? Colors.grey[300] : AppColors.primary,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: Text(
-                      'Keranjang',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      mainBtnLabel,
                       style: GoogleFonts.manrope(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                        fontSize: 13,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
             ],
-            Expanded(
-              flex: type == 'BARANG' ? 1 : 2,
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (type == 'BARANG') {
-                      _handleAddToCart();
-                    } else {
-                      _handleChat(); // For Service/Rental, direct chat is better
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    mainBtnLabel,
-                    style: GoogleFonts.manrope(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }

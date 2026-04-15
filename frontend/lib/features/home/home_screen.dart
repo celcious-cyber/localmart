@@ -13,6 +13,7 @@ import '../profile/profile_screen.dart';
 import '../localsend/localsend_screen.dart';
 import '../bills/bills_screen.dart';
 import '../localpay/localpay_screen.dart';
+import '../profile/screens/favorites_screen.dart';
 import '../kost/kost_screen.dart';
 import '../rental/rental_screen.dart';
 import '../transport/transport_screen.dart';
@@ -22,6 +23,9 @@ import '../second_hand/second_hand_screen.dart';
 import '../umkm/umkm_screen.dart';
 import '../agri/agri_screen.dart';
 import '../product/screens/product_detail_screen.dart';
+import '../profile/controllers/favorites_controller.dart';
+import '../../shared/widgets/reactive_cart_icon.dart';
+import 'package:get/get.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // API State
   final ApiService _api = ApiService();
+  final FavoritesController _favController = Get.put(FavoritesController());
   HomeResponseModel? _homeData;
   bool _isLoading = true;
 
@@ -431,28 +436,61 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Image
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(14),
-              ),
-              child: AspectRatio(
-                aspectRatio: 1.3,
-                child: Hero(
-                  tag: heroTag,
-                  child: Image.network(
-                    _api.getImageUrl(product.imageUrl),
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
+            // Product Image with Heart Overlay
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14),
+                  ),
+                  child: AspectRatio(
+                    aspectRatio: 1.3,
+                    child: Hero(
+                      tag: heroTag,
+                      child: Image.network(
+                        _api.getImageUrl(product.imageUrl),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                // Heart Icon Overlay
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Obx(() {
+                    final isFav = _favController.isFavorited(product.id);
+                    return GestureDetector(
+                      onTap: () => _favController.toggleFavorite(product),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          color: isFav ? Colors.red : Colors.grey[400],
+                          size: 18,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
-            // Product Info
+          // Product Info
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -911,11 +949,19 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
                   ),
                   const SizedBox(width: 12),
                   // Action Icons
-                  _buildHeaderIcon(Icons.home_outlined),
+                  _buildHeaderIcon(
+                    Icons.favorite_rounded,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => FavoritesScreen()),
+                      );
+                    },
+                  ),
                   const SizedBox(width: 8),
                   _buildHeaderIcon(Icons.qr_code_scanner_rounded),
                   const SizedBox(width: 8),
-                  _buildHeaderIcon(Icons.shopping_cart_outlined),
+                  const ReactiveCartIcon(),
                   const SizedBox(width: 8),
                   _buildHeaderIcon(Icons.mail_outline_rounded),
                 ],
@@ -927,18 +973,21 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     );
   }
 
-  Widget _buildHeaderIcon(IconData icon) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(
-        icon,
-        color: Colors.white,
-        size: 20,
+  Widget _buildHeaderIcon(IconData icon, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 20,
+        ),
       ),
     );
   }
