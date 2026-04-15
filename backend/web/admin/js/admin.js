@@ -57,8 +57,11 @@ if (loginForm) {
 }
 
 // --- Dashboard & Sections ---
-// This part will run if we are on dashboard.html
-if (window.location.pathname.includes('dashboard.html')) {
+const currentPath = window.location.pathname;
+const isLoginPage = currentPath === '/admin' || currentPath === '/admin/' || currentPath.includes('index.html');
+const isAdminPath = currentPath.startsWith('/admin');
+
+if (isAdminPath && !isLoginPage) {
     const adminUser = localStorage.getItem('admin_user');
     if (document.getElementById('adminName')) {
         document.getElementById('adminName').innerText = adminUser || 'Admin';
@@ -133,6 +136,9 @@ if (window.location.pathname.includes('dashboard.html')) {
             document.getElementById('storeCount').innerText = stats.stores || 0;
             document.getElementById('driverCount').innerText = stats.drivers || 0;
             
+            // Initialize Form Listeners
+            initFormListeners();
+
             // Detection from Pathname (SPA)
             const pathSegments = window.location.pathname.split('/');
             const initialSection = pathSegments[pathSegments.length - 1];
@@ -159,10 +165,10 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Banners Manager ---
     async function loadBanners() {
-        const banners = await handleResponse(await fetch(`${API_URL}/admin/banners`, { headers: getHeaders() }));
-        window.allBanners = banners;
+        const data = await handleResponse(await fetch(`${API_URL}/admin/banners`, { headers: getHeaders() }));
+        window.allBanners = data;
         const list = document.getElementById('bannerList');
-        list.innerHTML = banners.map(b => `
+        list.innerHTML = data.map(b => `
             <tr>
                 <td><img src="${b.image_url}" class="preview-img" style="width: 60px"></td>
                 <td>${b.title}</td>
@@ -178,10 +184,10 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Categories Manager ---
     async function loadCategories() {
-        const categories = await handleResponse(await fetch(`${API_URL}/admin/categories`, { headers: getHeaders() }));
-        window.allCategories = categories; // Cache for lookup
+        const data = await handleResponse(await fetch(`${API_URL}/admin/categories`, { headers: getHeaders() }));
+        window.allCategories = data;
         const list = document.getElementById('categoryList');
-        list.innerHTML = categories.map(c => {
+        list.innerHTML = data.map(c => {
             const safeType = c.type || 'BARANG';
             return `
                 <tr>
@@ -201,10 +207,10 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Products Manager ---
     async function loadProducts() {
-        const products = await handleResponse(await fetch(`${API_URL}/admin/products`, { headers: getHeaders() }));
-        window.allProducts = products;
+        const data = await handleResponse(await fetch(`${API_URL}/admin/products`, { headers: getHeaders() }));
+        window.allProducts = data;
         const list = document.getElementById('productList');
-        list.innerHTML = products.map(p => `
+        list.innerHTML = data.map(p => `
             <tr>
                 <td><img src="${p.image_url}" class="preview-img" style="width: 40px"></td>
                 <td>${p.name}</td>
@@ -220,10 +226,10 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Stores Manager ---
     async function loadStores() {
-        const stores = await handleResponse(await fetch(`${API_URL}/admin/stores`, { headers: getHeaders() }));
-        window.allStores = stores;
+        const data = await handleResponse(await fetch(`${API_URL}/admin/stores`, { headers: getHeaders() }));
+        window.allStores = data;
         const list = document.getElementById('storeList');
-        list.innerHTML = stores.map(s => `
+        list.innerHTML = data.map(s => `
             <tr>
                 <td>${s.name}</td>
                 <td>${s.owner?.first_name} ${s.owner?.last_name}</td>
@@ -237,10 +243,11 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Drivers Manager ---
     async function loadDrivers() {
-        const drivers = await handleResponse(await fetch(`${API_URL}/admin/drivers`, { headers: getHeaders() }));
+        const data = await handleResponse(await fetch(`${API_URL}/admin/drivers`, { headers: getHeaders() }));
+        window.allDrivers = data;
         const list = document.getElementById('driverList');
         if (!list) return;
-        list.innerHTML = drivers.map(d => {
+        list.innerHTML = data.map(d => {
             let statusColor = '#FFA500'; // pending
             if (d.status === 'approved') statusColor = '#4CAF50';
             if (d.status === 'rejected') statusColor = '#f44336';
@@ -266,9 +273,10 @@ if (window.location.pathname.includes('dashboard.html')) {
 
     // --- Home Sections (On/Off) ---
     async function loadHomeSections() {
-        const homeSections = await handleResponse(await fetch(`${API_URL}/admin/sections`, { headers: getHeaders() }));
+        const data = await handleResponse(await fetch(`${API_URL}/admin/sections`, { headers: getHeaders() }));
+        window.allSections = data;
         const list = document.getElementById('homeSectionList');
-        list.innerHTML = homeSections.map(s => `
+        list.innerHTML = data.map(s => `
             <tr>
                 <td>${s.title}</td>
                 <td>${s.key}</td>
@@ -282,12 +290,13 @@ if (window.location.pathname.includes('dashboard.html')) {
             </tr>
         `).join('');
     }
-    // --- Voucher Manager ---
+
     async function loadVouchers() {
-        const vouchers = await handleResponse(await fetch(`${API_URL}/admin/vouchers`, { headers: getHeaders() }));
+        const data = await handleResponse(await fetch(`${API_URL}/admin/vouchers`, { headers: getHeaders() }));
+        window.allVouchers = data;
         const list = document.getElementById('voucherList');
         if (!list) return;
-        list.innerHTML = vouchers.map(v => `
+        list.innerHTML = data.map(v => `
             <tr>
                 <td><strong>${v.code}</strong></td>
                 <td><span class="badge ${v.type === 'PERCENT' ? 'badge-blue' : 'badge-green'}">${v.type}</span></td>
@@ -300,6 +309,166 @@ if (window.location.pathname.includes('dashboard.html')) {
                 </td>
             </tr>
         `).join('');
+    }
+
+    // --- Modal Helpers ---
+    window.openBannerModalById = (id) => {
+        const data = (window.allBanners || []).find(b => b.id == id);
+        openBannerModal(data);
+    };
+    window.openCategoryModalById = (id) => {
+        const data = (window.allCategories || []).find(c => c.id == id);
+        openCategoryModal(data);
+    };
+    window.openProductModalById = (id) => {
+        const data = (window.allProducts || []).find(p => p.id == id);
+        openProductModal(data);
+    };
+    window.openStoreModalById = (id) => {
+        const data = (window.allStores || []).find(s => s.id == id);
+        openStoreModal(data);
+    };
+    window.openDriverModalById = (id) => {
+        const data = (window.allDrivers || []).find(d => d.id == id);
+        openDriverModal(data);
+    };
+    window.openSectionModalById = (id) => {
+        const data = (window.allSections || []).find(s => s.id == id);
+        openSectionModal(data);
+    };
+    window.openVoucherModalById = (id) => {
+        const data = (window.allVouchers || []).find(v => v.id == id);
+        openVoucherModal(data);
+    };
+
+    window.openBannerModal = (data = null) => {
+        const modal = document.getElementById('bannerModal');
+        document.getElementById('bannerForm').reset();
+        document.getElementById('b_preview').src = '';
+        if (data) {
+            document.getElementById('bannerId').value = data.id;
+            document.getElementById('b_title').value = data.title;
+            document.getElementById('b_image_url').value = data.image_url;
+            document.getElementById('b_preview').src = data.image_url;
+            document.getElementById('b_position').value = data.position;
+            document.getElementById('b_order').value = data.sort_order;
+        } else { document.getElementById('bannerId').value = ''; }
+        modal.style.display = 'flex';
+    };
+
+    window.openCategoryModal = (data = null) => {
+        const modal = document.getElementById('categoryModal');
+        document.getElementById('categoryForm').reset();
+        if (data) {
+            document.getElementById('categoryId').value = data.id;
+            document.getElementById('c_name').value = data.name;
+            document.getElementById('c_slug').value = data.slug;
+            document.getElementById('c_icon_name').value = data.icon_name;
+            document.getElementById('c_type').value = data.type || 'BARANG';
+            document.getElementById('c_order').value = data.sort_order;
+        } else { document.getElementById('categoryId').value = ''; }
+        modal.style.display = 'flex';
+    };
+
+    window.openProductModal = (data = null) => {
+        const modal = document.getElementById('productModal');
+        document.getElementById('productForm').reset();
+        document.getElementById('p_preview').src = '';
+        if (data) {
+            document.getElementById('productId').value = data.id;
+            document.getElementById('p_name').value = data.name;
+            document.getElementById('p_cat_id').value = data.category_id;
+            document.getElementById('p_price').value = data.price;
+            document.getElementById('p_image_url').value = data.image_url;
+            document.getElementById('p_preview').src = data.image_url;
+            document.getElementById('p_desc').value = data.description;
+        } else { document.getElementById('productId').value = ''; }
+        modal.style.display = 'flex';
+    };
+
+    window.openVoucherModal = (data = null) => {
+        const modal = document.getElementById('voucherModal');
+        document.getElementById('voucherForm').reset();
+        if (data) {
+            document.getElementById('voucherId').value = data.id;
+            document.getElementById('v_code').value = data.code;
+            document.getElementById('v_type').value = data.type;
+            document.getElementById('v_value').value = data.value;
+            document.getElementById('v_min_order').value = data.min_order;
+            document.getElementById('v_max_discount').value = data.max_discount;
+        } else { document.getElementById('voucherId').value = ''; }
+        modal.style.display = 'flex';
+    };
+
+    window.openSectionModal = (data = null) => {
+        const modal = document.getElementById('sectionModal');
+        document.getElementById('sectionForm').reset();
+        if (data) {
+            document.getElementById('sectionId').value = data.id;
+            document.getElementById('s_title').value = data.title;
+            document.getElementById('s_key').value = data.key;
+            document.getElementById('s_order').value = data.sort_order;
+        } else { document.getElementById('sectionId').value = ''; }
+        modal.style.display = 'flex';
+    };
+
+    window.closeModals = () => {
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    };
+
+    // --- Forms Submission ---
+    window.initFormListeners = () => {
+        const bannerForm = document.getElementById('bannerForm');
+        if (bannerForm) bannerForm.onsubmit = (e) => submitForm(e, 'bannerId', 'banners', {
+            title: document.getElementById('b_title').value,
+            image_url: document.getElementById('b_image_url').value,
+            position: document.getElementById('b_position').value,
+            sort_order: parseInt(document.getElementById('b_order').value),
+            is_active: true
+        });
+
+        const categoryForm = document.getElementById('categoryForm');
+        if (categoryForm) categoryForm.onsubmit = (e) => submitForm(e, 'categoryId', 'categories', {
+            name: document.getElementById('c_name').value,
+            slug: document.getElementById('c_slug').value,
+            icon_name: document.getElementById('c_icon_name').value,
+            type: document.getElementById('c_type').value,
+            sort_order: parseInt(document.getElementById('c_order').value),
+            is_active: true
+        });
+
+        const productForm = document.getElementById('productForm');
+        if (productForm) productForm.onsubmit = (e) => submitForm(e, 'productId', 'products', {
+            name: document.getElementById('p_name').value,
+            category_id: parseInt(document.getElementById('p_cat_id').value),
+            price: parseFloat(document.getElementById('p_price').value),
+            image_url: document.getElementById('p_image_url').value,
+            description: document.getElementById('p_desc').value,
+            is_active: true
+        });
+
+        const voucherForm = document.getElementById('voucherForm');
+        if (voucherForm) voucherForm.onsubmit = (e) => submitForm(e, 'voucherId', 'vouchers', {
+            code: document.getElementById('v_code').value,
+            type: document.getElementById('v_type').value,
+            value: parseFloat(document.getElementById('v_value').value),
+            min_order: parseFloat(document.getElementById('v_min_order').value),
+            max_discount: parseFloat(document.getElementById('v_max_discount').value),
+            is_active: true
+        });
+    };
+
+    async function submitForm(e, idField, type, payload) {
+        e.preventDefault();
+        const id = document.getElementById(idField).value;
+        const url = id ? `${API_URL}/admin/${type}/${id}` : `${API_URL}/admin/${type}`;
+        const method = id ? 'PUT' : 'POST';
+        try {
+            await handleResponse(await fetch(url, {
+                method, headers: getHeaders(), body: JSON.stringify(payload)
+            }));
+            location.reload();
+        } catch (err) { alert(err.message); }
     }
 
     initDashboard();
