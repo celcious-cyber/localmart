@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 import 'add_product_screen.dart';
@@ -193,12 +194,11 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
               final result = await ApiService().deleteStoreProduct(product.id);
               if (mounted) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(result['message']),
-                      backgroundColor: result['success'] ? Colors.green : Colors.red,
-                    ),
-                  );
+                  if (result['success']) {
+                    AppAlert.success('Terhapus', result['message'] ?? 'Produk telah dihapus');
+                  } else {
+                    AppAlert.error('Gagal Menghapus', result['message'] ?? 'Terjadi kesalahan');
+                  }
                 }
                 _loadProducts();
               }

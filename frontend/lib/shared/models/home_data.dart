@@ -38,6 +38,7 @@ class CategoryModel {
   final String slug;
   final String iconName;
   final String type;
+  final String serviceType;
   final int sortOrder;
   final bool isActive;
   final List<ProductModel> products;
@@ -48,6 +49,7 @@ class CategoryModel {
     required this.slug,
     required this.iconName,
     required this.type,
+    required this.serviceType,
     required this.sortOrder,
     required this.isActive,
     required this.products,
@@ -60,6 +62,7 @@ class CategoryModel {
       slug: json['slug'] ?? '',
       iconName: json['icon_name'] ?? '',
       type: json['type'] ?? 'BARANG',
+      serviceType: json['service_type'] ?? 'mart',
       sortOrder: json['sort_order'] ?? 0,
       isActive: json['is_active'] ?? true,
       products: (json['products'] as List?)
@@ -90,6 +93,7 @@ class ProductModel {
   final int id;
   final int categoryId;
   final int storeId;
+  final List<StoreCategoryModel> storeCategories;
   final String name;
   final String description;
   final double price;
@@ -108,7 +112,11 @@ class ProductModel {
   final int minOrder;
   final String productType;
   final String metadata;
+  final String serviceType;
   final bool isActive;
+  final bool isFresh;
+  final bool isFeatured;
+  final bool isLocalGem;
   final List<ProductImageModel> images;
   final List<ProductVariantModel> variants;
   final StoreModel? store;
@@ -118,6 +126,7 @@ class ProductModel {
     required this.id,
     required this.categoryId,
     required this.storeId,
+    this.storeCategories = const [],
     required this.name,
     required this.description,
     required this.price,
@@ -135,8 +144,12 @@ class ProductModel {
     this.sku = '',
     this.minOrder = 1,
     this.productType = 'BARANG',
+    this.serviceType = 'mart',
     this.metadata = '{}',
     this.isActive = true,
+    this.isFresh = false,
+    this.isFeatured = false,
+    this.isLocalGem = false,
     this.images = const [],
     this.variants = const [],
     this.store,
@@ -148,6 +161,10 @@ class ProductModel {
       id: json['id'] ?? 0,
       categoryId: json['category_id'] ?? 0,
       storeId: json['store_id'] ?? 0,
+      storeCategories: (json['store_categories'] as List?)
+          ?.map((e) => StoreCategoryModel.fromJson(e))
+          .toList() ??
+          [],
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -166,7 +183,11 @@ class ProductModel {
       sku: json['sku'] ?? '',
       minOrder: json['min_order'] ?? 1,
       productType: json['product_type'] ?? 'BARANG',
+      serviceType: json['service_type'] ?? 'mart',
       metadata: json['metadata'] ?? '{}',
+      isFresh: json['is_fresh'] ?? false,
+      isFeatured: json['is_featured'] ?? false,
+      isLocalGem: json['is_local_gem'] ?? false,
       images: (json['images'] as List?)
           ?.map((e) => ProductImageModel.fromJson(e))
           .toList() ??
@@ -186,6 +207,7 @@ class ProductModel {
     return {
       'id': id,
       'category_id': categoryId,
+      'store_categories': storeCategories.map((e) => e.toJson()).toList(),
       'name': name,
       'description': description,
       'price': price,
@@ -196,6 +218,9 @@ class ProductModel {
       'rating': rating,
       'review_count': reviewCount,
       'is_active': isActive,
+      'is_fresh': isFresh,
+      'is_featured': isFeatured,
+      'is_local_gem': isLocalGem,
       'weight': weight,
       'length': length,
       'width': width,
@@ -298,12 +323,45 @@ class DiscoveryTabModel {
   }
 }
 
+class ModuleDiscoveryModel {
+  final String name;
+  final String? discoveryTitle;
+  final String slug;
+  final List<CategoryModel> categories;
+  final List<ProductModel> products;
+
+  ModuleDiscoveryModel({
+    required this.name,
+    this.discoveryTitle,
+    required this.slug,
+    required this.categories,
+    required this.products,
+  });
+
+  factory ModuleDiscoveryModel.fromJson(Map<String, dynamic> json) {
+    return ModuleDiscoveryModel(
+      name: json['name'] ?? '',
+      discoveryTitle: json['discovery_title'],
+      slug: json['slug'] ?? '',
+      categories: (json['categories'] as List?)
+              ?.map((c) => CategoryModel.fromJson(c))
+              .toList() ??
+          [],
+      products: (json['products'] as List?)
+              ?.map((p) => ProductModel.fromJson(p))
+              .toList() ??
+          [],
+    );
+  }
+}
+
 class HomeResponseModel {
   final List<BannerModel> banners;
   final List<BannerModel> bannerSliders;
   final List<CategoryModel> categories;
   final List<SectionModel> sections;
   final List<DiscoveryTabModel> discoveryTabs;
+  final List<ModuleDiscoveryModel> modules;
 
   HomeResponseModel({
     required this.banners,
@@ -311,6 +369,7 @@ class HomeResponseModel {
     required this.categories,
     required this.sections,
     required this.discoveryTabs,
+    required this.modules,
   });
 
   factory HomeResponseModel.fromJson(Map<String, dynamic> json) {
@@ -333,6 +392,10 @@ class HomeResponseModel {
           [],
       discoveryTabs: (json['discovery_tabs'] as List?)
               ?.map((t) => DiscoveryTabModel.fromJson(t))
+              .toList() ??
+          [],
+      modules: (json['modules'] as List?)
+              ?.map((m) => ModuleDiscoveryModel.fromJson(m))
               .toList() ??
           [],
     );

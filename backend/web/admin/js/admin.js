@@ -17,6 +17,14 @@ const handleResponse = async (response) => {
     return data.data;
 };
 
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(amount);
+};
+
 // --- Auth ---
 const loginForm = document.getElementById('loginForm');
 if (loginForm) {
@@ -97,11 +105,14 @@ if (isAdminPath && !isLoginPage) {
         const sectionTitle = document.getElementById('sectionTitle');
         if (sectionTitle) sectionTitle.innerText = activeLink.innerText.trim();
 
-        // History Management
+        // State & History Management
         if (updateHistory) {
-            const newPath = `/admin/${targetId}`;
-            if (window.location.pathname !== newPath) {
-                history.pushState({ section: targetId }, '', newPath);
+            localStorage.setItem('active_admin_section', targetId);
+            // Sync Hash (e.g., #stores)
+            const currentHash = window.location.hash;
+            const baseUrl = currentHash.includes('?') ? currentHash.split('?')[0] : currentHash;
+            if (baseUrl !== `#${targetId}`) {
+                window.location.hash = targetId;
             }
         }
 
@@ -139,15 +150,37 @@ if (isAdminPath && !isLoginPage) {
             // Initialize Form Listeners
             initFormListeners();
 
-            // Detection from Pathname (SPA)
-            const pathSegments = window.location.pathname.split('/');
-            const initialSection = pathSegments[pathSegments.length - 1];
-            
-            if (initialSection && initialSection !== 'admin' && initialSection !== 'dashboard.html') {
-                switchSection(initialSection, false);
-            } else {
-                switchSection('overview', false);
+            // --- State Restoration Logic ---
+            let sectionToLoad = 'overview';
+            const hash = window.location.hash.substring(1).split('?')[0];
+            const savedSection = localStorage.getItem('active_admin_section');
+
+            if (hash) {
+                sectionToLoad = hash;
+            } else if (savedSection) {
+                sectionToLoad = savedSection;
             }
+
+            // Restore section
+            switchSection(sectionToLoad, false);
+
+            // Restore category filter if in categories section
+            if (sectionToLoad === 'categories') {
+                const params = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
+                const hashType = params.get('type');
+                const savedType = localStorage.getItem('active_category_tab');
+                const typeToApply = hashType || savedType || '';
+                
+                // Allow some time for DOM to stabilize if needed, but normally direct call is fine
+                filterCategories(typeToApply, false);
+            }
+
+            // Global Hash Listener for deep linking
+            window.addEventListener('hashchange', () => {
+                const newHash = window.location.hash.substring(1).split('?')[0];
+                if (newHash) switchSection(newHash, false);
+            });
+
         } catch (err) {
             console.error('Failed to load dashboard:', err);
         }
@@ -183,16 +216,53 @@ if (isAdminPath && !isLoginPage) {
     }
 
     // --- Categories Manager ---
+    window.filterCategories = async (serviceType, updateHistory = true) => {
+        // Update Tab Active State
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        const activeTab = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+            (serviceType === '' && btn.innerText === 'Semua') || 
+            (serviceType && btn.getAttribute('onclick').includes(`'${serviceType}'`))
+        );
+        
+        if (activeTab) {
+            activeTab.classList.add('active');
+            // Auto-scroll tab into view
+            activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+
+        // Persistence
+        if (updateHistory) {
+            localStorage.setItem('active_category_tab', serviceType);
+            // Update Hash with param (e.g., #categories?type=food)
+            const baseUrl = window.location.hash.split('?')[0] || '#categories';
+            if (serviceType) {
+                window.location.hash = `${baseUrl}?type=${serviceType}`;
+            } else {
+                window.location.hash = baseUrl;
+            }
+        }
+
+        const url = serviceType ? `${API_URL}/admin/categories?service_type=${serviceType}` : `${API_URL}/admin/categories`;
+        const data = handleResponse(await fetch(url, { headers: getHeaders() }));
+        renderCategories(await data);
+    };
+
     async function loadCategories() {
         const data = await handleResponse(await fetch(`${API_URL}/admin/categories`, { headers: getHeaders() }));
         window.allCategories = data;
+        renderCategories(data);
+    }
+
+    function renderCategories(data) {
         const list = document.getElementById('categoryList');
+        if (!list) return;
         list.innerHTML = data.map(c => {
             const safeType = c.type || 'BARANG';
             return `
                 <tr>
                     <td><i class="material-icons">${c.icon_name}</i></td>
                     <td>${c.name}</td>
+                    <td><span class="badge badge-blue">${c.service_type || 'mart'}</span></td>
                     <td>${c.slug}</td>
                     <td><span class="badge badge-${safeType.toLowerCase()}">${safeType}</span></td>
                     <td>${c.sort_order}</td>
@@ -229,11 +299,29 @@ if (isAdminPath && !isLoginPage) {
         const data = await handleResponse(await fetch(`${API_URL}/admin/stores`, { headers: getHeaders() }));
         window.allStores = data;
         const list = document.getElementById('storeList');
+        if (!list) return;
+
+        const getModuleBadge = (mod) => {
+            const colors = {
+                'food': '#4CAF50', 'kost': '#2196F3', 'rental': '#FF9800', 
+                'transport': '#3F51B5', 'jasa': '#009688', 'umkm': '#9C27B0', 
+                'bumi': '#795548', 'wisata': '#00BCD4', 'second': '#E91E63'
+            };
+            const label = mod.name || mod.code;
+            const color = colors[mod.code] || '#607D8B';
+            return `<span class="badge" style="background: ${color}; color: white; margin: 2px; font-size: 0.7rem;">${label}</span>`;
+        };
+
         list.innerHTML = data.map(s => `
             <tr>
-                <td>${s.name}</td>
-                <td>${s.owner?.first_name} ${s.owner?.last_name}</td>
-                <td><span class="badge ${s.is_verified ? 'badge-barang' : 'badge-rental'}">${s.is_verified ? 'Verified' : 'Pending'}</span></td>
+                <td><strong>${s.name}</strong></td>
+                <td>${s.user ? s.user.first_name + ' ' + s.user.last_name : 'N/A'}</td>
+                <td style="max-width: 250px;">
+                    ${(s.business_modules || []).map(m => getModuleBadge(m)).join('') || '<span style="color: grey; font-style: italic;">No Modules</span>'}
+                </td>
+                <td><span class="badge ${s.status === 'approved' ? 'badge-blue' : (s.status === 'rejected' ? 'badge-rental' : 'badge-green')}">
+                    ${s.status.toUpperCase()} ${s.is_verified ? '✓' : ''}
+                </span></td>
                 <td>
                     <button class="action-btn edit-btn" onclick="openStoreModalById(${s.id})">View/Edit</button>
                 </td>
@@ -364,26 +452,113 @@ if (isAdminPath && !isLoginPage) {
             document.getElementById('c_name').value = data.name;
             document.getElementById('c_slug').value = data.slug;
             document.getElementById('c_icon_name').value = data.icon_name;
+            document.getElementById('c_service_type').value = data.service_type || 'mart';
             document.getElementById('c_type').value = data.type || 'BARANG';
             document.getElementById('c_order').value = data.sort_order;
-        } else { document.getElementById('categoryId').value = ''; }
+        } else { 
+            document.getElementById('categoryId').value = ''; 
+            document.getElementById('c_service_type').value = '';
+        }
         modal.style.display = 'flex';
     };
 
-    window.openProductModal = (data = null) => {
+    window.openProductModal = async (data = null) => {
         const modal = document.getElementById('productModal');
         document.getElementById('productForm').reset();
         document.getElementById('p_preview').src = '';
+        
+        const catSelect = document.getElementById('p_cat_id');
+        catSelect.innerHTML = '<option value="">Pilih Modul Dulu...</option>';
+        catSelect.disabled = true;
+
         if (data) {
             document.getElementById('productId').value = data.id;
             document.getElementById('p_name').value = data.name;
-            document.getElementById('p_cat_id').value = data.category_id;
             document.getElementById('p_price').value = data.price;
             document.getElementById('p_image_url').value = data.image_url;
             document.getElementById('p_preview').src = data.image_url;
             document.getElementById('p_desc').value = data.description;
-        } else { document.getElementById('productId').value = ''; }
+            
+            // Set Service Type first
+            const serviceType = data.service_type || 'mart';
+            document.getElementById('p_service_type').value = serviceType;
+            
+            // Load and set categories for this service type
+            await handleModuleChange(data.category_id);
+        } else { 
+            document.getElementById('productId').value = ''; 
+        }
         modal.style.display = 'flex';
+    };
+
+    window.openStoreModal = async (data = null) => {
+        const modal = document.getElementById('storeModal');
+        const form = document.getElementById('storeForm');
+        form.reset();
+        
+        const container = document.getElementById('moduleCheckboxContainer');
+        container.innerHTML = 'Loading modules...';
+
+        if (!data) return; // Store create not supported via admin for now
+
+        // 1. Populate basic info
+        document.getElementById('storeId').value = data.id;
+        document.getElementById('s_store_name').value = data.name;
+        document.getElementById('s_owner_name').value = data.user ? `${data.user.first_name} ${data.user.last_name}` : 'Unknown';
+        document.getElementById('s_status').value = data.status || 'pending';
+        document.getElementById('s_level').value = data.level || 'regular';
+        document.getElementById('s_is_verified').checked = data.is_verified;
+
+        // 2. Fetch all possible modules for checkboxes
+        try {
+            const constants = await handleResponse(await fetch(`${API_URL}/store/constants`));
+            const availableModules = constants.modules || [];
+            const currentModuleCodes = (data.business_modules || []).map(m => m.code);
+
+            container.innerHTML = availableModules.map(m => `
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem;">
+                    <input type="checkbox" name="module_ids" value="${m.id}" id="mod_${m.code}" ${currentModuleCodes.includes(m.code) ? 'checked' : ''} style="width: auto;">
+                    <label for="mod_${m.code}" style="margin: 0; cursor: pointer; font-size: 0.85rem;">${m.name}</label>
+                </div>
+            `).join('');
+
+        } catch (err) {
+            container.innerHTML = '<span style="color: red;">Gagal memuat daftar modul</span>';
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    window.handleModuleChange = async (selectedCategoryId = null) => {
+        const serviceType = document.getElementById('p_service_type').value;
+        const catSelect = document.getElementById('p_cat_id');
+        const loader = document.getElementById('catLoading');
+
+        if (!serviceType) {
+            catSelect.innerHTML = '<option value="">Pilih Modul Dulu...</option>';
+            catSelect.disabled = true;
+            return;
+        }
+
+        // Show loading state
+        catSelect.disabled = true;
+        catSelect.innerHTML = '<option value="">Loading categories...</option>';
+        if (loader) loader.style.display = 'block';
+
+        try {
+            const url = `${API_URL}/admin/categories?service_type=${serviceType}`;
+            const categories = await handleResponse(await fetch(url, { headers: getHeaders() }));
+            
+            catSelect.innerHTML = categories.length > 0 
+                ? categories.map(c => `<option value="${c.id}" ${selectedCategoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')
+                : '<option value="">Tidak ada kategori untuk modul ini</option>';
+            
+            catSelect.disabled = categories.length === 0;
+        } catch (err) {
+            catSelect.innerHTML = '<option value="">Gagal memuat data</option>';
+        } finally {
+            if (loader) loader.style.display = 'none';
+        }
     };
 
     window.openVoucherModal = (data = null) => {
@@ -428,19 +603,28 @@ if (isAdminPath && !isLoginPage) {
         });
 
         const categoryForm = document.getElementById('categoryForm');
-        if (categoryForm) categoryForm.onsubmit = (e) => submitForm(e, 'categoryId', 'categories', {
-            name: document.getElementById('c_name').value,
-            slug: document.getElementById('c_slug').value,
-            icon_name: document.getElementById('c_icon_name').value,
-            type: document.getElementById('c_type').value,
-            sort_order: parseInt(document.getElementById('c_order').value),
-            is_active: true
-        });
+        if (categoryForm) categoryForm.onsubmit = (e) => {
+            const serviceType = document.getElementById('c_service_type').value;
+            if (!serviceType) {
+                alert('Pilih Modul / Layanan terlebih dahulu!');
+                return;
+            }
+            submitForm(e, 'categoryId', 'categories', {
+                name: document.getElementById('c_name').value,
+                slug: document.getElementById('c_slug').value,
+                icon_name: document.getElementById('c_icon_name').value,
+                service_type: serviceType,
+                type: document.getElementById('c_type').value,
+                sort_order: parseInt(document.getElementById('c_order').value),
+                is_active: true
+            });
+        };
 
         const productForm = document.getElementById('productForm');
         if (productForm) productForm.onsubmit = (e) => submitForm(e, 'productId', 'products', {
             name: document.getElementById('p_name').value,
             category_id: parseInt(document.getElementById('p_cat_id').value),
+            service_type: document.getElementById('p_service_type').value,
             price: parseFloat(document.getElementById('p_price').value),
             image_url: document.getElementById('p_image_url').value,
             description: document.getElementById('p_desc').value,
@@ -456,6 +640,43 @@ if (isAdminPath && !isLoginPage) {
             max_discount: parseFloat(document.getElementById('v_max_discount').value),
             is_active: true
         });
+
+        const storeForm = document.getElementById('storeForm');
+        if (storeForm) storeForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('storeId').value;
+            
+            // Get selected modules
+            const selectedModuleIds = Array.from(document.querySelectorAll('input[name="module_ids"]:checked'))
+                .map(cb => parseInt(cb.value));
+
+            const payload = {
+                status: document.getElementById('s_status').value,
+                level: document.getElementById('s_level').value,
+                is_verified: document.getElementById('s_is_verified').checked,
+                business_module_ids: selectedModuleIds
+            };
+
+            const submitBtn = storeForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Saving...';
+
+            try {
+                await handleResponse(await fetch(`${API_URL}/admin/stores/${id}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify(payload)
+                }));
+                
+                alert('Success: Data toko berhasil diperbarui!');
+                location.reload();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Save Store Metadata';
+            }
+        };
     };
 
     async function submitForm(e, idField, type, payload) {

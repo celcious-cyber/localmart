@@ -133,11 +133,27 @@
                     <h3>Category Management</h3>
                     <button class="action-btn" onclick="openCategoryModal()">+ Add Category</button>
                 </div>
+
+                <!-- Filament-style Tabs -->
+                <div class="horizontal-tabs">
+                    <button class="tab-btn active" onclick="filterCategories('')">Semua</button>
+                    <button class="tab-btn" onclick="filterCategories('food')">Kuliner & Resto</button>
+                    <button class="tab-btn" onclick="filterCategories('kost')">Properti & Penginapan</button>
+                    <button class="tab-btn" onclick="filterCategories('rental')">Rental Kendaraan</button>
+                    <button class="tab-btn" onclick="filterCategories('transport')">Tiket & Transportasi</button>
+                    <button class="tab-btn" onclick="filterCategories('jasa')">Layanan Jasa</button>
+                    <button class="tab-btn" onclick="filterCategories('umkm')">Produk UMKM & Kriya</button>
+                    <button class="tab-btn" onclick="filterCategories('bumi')">Agrikultur & Pertanian</button>
+                    <button class="tab-btn" onclick="filterCategories('wisata')">Pariwisata & Tur</button>
+                    <button class="tab-btn" onclick="filterCategories('second')">Barang Preloved</button>
+                </div>
+
                 <table>
                     <thead>
                         <tr>
                             <th>Icon</th>
                             <th>Name</th>
+                            <th>Modul</th>
                             <th>Slug</th>
                             <th>Type</th>
                             <th>Order</th>
@@ -202,8 +218,7 @@
                         <tr>
                             <th>Store Name</th>
                             <th>Owner</th>
-                            <th>Category</th>
-                            <th>Joined At</th>
+                            <th>Bisnis Modul</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -314,6 +329,22 @@
                     <input type="text" id="c_icon_name" placeholder="shopping_cart" required>
                 </div>
                 <div class="form-group">
+                    <label>Modul / Layanan</label>
+                    <select id="c_service_type" required style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <option value="">-- Pilih Modul --</option>
+                        <option value="mart">Mart (General)</option>
+                        <option value="food">Kuliner & Resto</option>
+                        <option value="kost">Properti & Penginapan</option>
+                        <option value="rental">Rental Kendaraan</option>
+                        <option value="transport">Tiket & Transportasi</option>
+                        <option value="jasa">Layanan Jasa</option>
+                        <option value="umkm">Produk UMKM & Kriya</option>
+                        <option value="bumi">Agrikultur & Pertanian</option>
+                        <option value="wisata">Pariwisata & Tur</option>
+                        <option value="second">Barang Preloved</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Category Type</label>
                     <select id="c_type" style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
                         <option value="BARANG">BARANG (Fisik)</option>
@@ -345,8 +376,29 @@
                     <input type="text" id="p_name" required>
                 </div>
                 <div class="form-group">
-                    <label>Category ID</label>
-                    <input type="number" id="p_cat_id" required>
+                    <label>Modul / Layanan</label>
+                    <select id="p_service_type" required onchange="handleModuleChange()">
+                        <option value="">-- Pilih Modul --</option>
+                        <option value="mart">Mart (General)</option>
+                        <option value="food">Kuliner & Resto</option>
+                        <option value="kost">Properti & Penginapan</option>
+                        <option value="rental">Rental Kendaraan</option>
+                        <option value="transport">Tiket & Transportasi</option>
+                        <option value="jasa">Layanan Jasa</option>
+                        <option value="umkm">Produk UMKM & Kriya</option>
+                        <option value="bumi">Agrikultur & Pertanian</option>
+                        <option value="wisata">Pariwisata & Tur</option>
+                        <option value="second">Barang Preloved</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <div class="select-wrapper">
+                        <select id="p_cat_id" required disabled>
+                            <option value="">Pilih Modul Dulu...</option>
+                        </select>
+                        <div id="catLoading" class="small-loader" style="display: none;"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Price</label>
@@ -370,7 +422,69 @@
         </div>
     </div>
 
-    <script src="/admin/js/admin.js?v=2.0.1"></script>
+    <!-- Store Management Modal -->
+    <div id="storeModal" class="modal">
+        <div class="modal-content">
+            <h3>Store Editor</h3>
+            <form id="storeForm" style="margin-top: 1.5rem;">
+                <input type="hidden" id="storeId">
+                
+                <div class="form-group">
+                    <label>Store Name (Read-only)</label>
+                    <input type="text" id="s_store_name" disabled>
+                </div>
+                
+                <div class="form-group">
+                    <label>Owner (Read-only)</label>
+                    <input type="text" id="s_owner_name" disabled>
+                </div>
+
+                <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="s_status" required style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                            <option value="pending">Pending Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Store Level</label>
+                        <select id="s_level" required style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                            <option value="regular">Regular Seller</option>
+                            <option value="star">Star Seller</option>
+                            <option value="mall">Mart Mall</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Verification Status</label>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                        <input type="checkbox" id="s_is_verified" style="width: auto;">
+                        <label for="s_is_verified" style="margin: 0; cursor: pointer;">Centang jika toko sudah diverifikasi identitasnya</label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label>Authorized Business Modules</label>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+                        Tentukan modul mana yang bisa diakses oleh toko ini untuk mengupload produk.
+                    </p>
+                    <div id="moduleCheckboxContainer" class="checkbox-group-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <!-- JS Dynamic: Modules checkboxes -->
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit">Save Store Metadata</button>
+                    <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/admin/js/admin.js?v=2.0.2"></script>
     <script>
         // Check Auth
         if (!localStorage.getItem('admin_token')) {

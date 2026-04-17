@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/models/home_data.dart';
 import '../../shared/models/user_model.dart';
 import '../../shared/models/store_models.dart';
+import '../../shared/models/review_model.dart';
 import '../../features/auth/widgets/auth_utils.dart';
 
 class ApiService {
@@ -37,6 +38,11 @@ class ApiService {
         return handler.next(e);
       },
     ));
+  }
+
+  // --- GENERIC METHODS ---
+  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+    return await _dio.get(path, queryParameters: queryParameters);
   }
 
   // --- AUTH METHODS ---
@@ -120,6 +126,18 @@ class ApiService {
   }
   // --- FULL STORE MANAGEMENT ---
 
+  Future<Map<String, dynamic>> deleteStore() async {
+    try {
+      final response = await _dio.delete('/user/store');
+      return response.data;
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        return e.response!.data;
+      }
+      return {'success': false, 'message': 'Gagal menghapus toko'};
+    }
+  }
+
   Future<StoreDashboardModel?> getStoreDashboard() async {
     try {
       final response = await _dio.get('/user/store/dashboard');
@@ -187,17 +205,88 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> updateStoreSettings({
+    String? bannerUrl,
+    String? logoUrl,
+    String? description,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (bannerUrl != null) data['banner_url'] = bannerUrl;
+      if (logoUrl != null) data['logo_url'] = logoUrl;
+      if (description != null) data['description'] = description;
+
+      final response = await _dio.patch('/user/store/settings', data: data);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {
+          'success': true, 
+          'message': 'Pengaturan toko diperbarui', 
+          'data': StoreModel.fromJson(response.data['data'])
+        };
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal update pengaturan'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<List<StoreCategoryModel>> getStoreCategories() async {
+    try {
+      final response = await _dio.get('/user/store/categories');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((c) => StoreCategoryModel.fromJson(c))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching store categories: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> createStoreCategory(String name, {int sortOrder = 0}) async {
+    try {
+      final response = await _dio.post('/user/store/categories', data: {
+        'name': name,
+        'sort_order': sortOrder,
+      });
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        return {'success': true, 'data': StoreCategoryModel.fromJson(response.data['data'])};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal buat etalase'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateStoreCategory(int id, String name, {int sortOrder = 0}) async {
+    try {
+      final response = await _dio.put('/user/store/categories/$id', data: {
+        'name': name,
+        'sort_order': sortOrder,
+      });
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'data': StoreCategoryModel.fromJson(response.data['data'])};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal update etalase'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
   // --- REGISTRATION ROLES ---
 
   Future<Map<String, dynamic>> registerStore({
     required String name,
     required String category,
+    required List<String> serviceTypes,
     required String address,
   }) async {
     try {
       final response = await _dio.post('/user/store/register', data: {
         'name': name,
         'category': category,
+        'service_types': serviceTypes,
         'address': address,
       });
 
@@ -211,6 +300,23 @@ class ApiService {
       }
       return {'success': false, 'message': 'Gagal terhubung ke server'};
     }
+  }
+
+  Future<List<Map<String, String>>> getStoreConstants() async {
+    try {
+      final response = await _dio.get('/store/constants');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((m) => {
+                  'code': m['code'] as String,
+                  'name': m['name'] as String,
+                })
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching store constants: $e');
+    }
+    return [];
   }
 
   Future<Map<String, dynamic>> registerDriver({
@@ -257,6 +363,15 @@ class ApiService {
     try {
       final formData = FormData.fromMap(data);
       
+      // Ensure store_category_ids are handled correctly for multipart
+      if (data.containsKey('store_category_ids')) {
+        final List ids = data['store_category_ids'];
+        formData.fields.removeWhere((e) => e.key == 'store_category_ids');
+        for (var id in ids) {
+          formData.fields.add(MapEntry('store_category_ids[]', id.toString()));
+        }
+      }
+
       for (int i = 0; i < images.length; i++) {
         formData.files.add(MapEntry(
           'images[]',
@@ -278,6 +393,15 @@ class ApiService {
   Future<Map<String, dynamic>> updateStoreProductMulti(int id, Map<String, dynamic> data, List<Uint8List> images) async {
     try {
       final formData = FormData.fromMap(data);
+
+      // Ensure store_category_ids are handled correctly for multipart
+      if (data.containsKey('store_category_ids')) {
+        final List ids = data['store_category_ids'];
+        formData.fields.removeWhere((e) => e.key == 'store_category_ids');
+        for (var id in ids) {
+          formData.fields.add(MapEntry('store_category_ids[]', id.toString()));
+        }
+      }
       
       for (int i = 0; i < images.length; i++) {
         formData.files.add(MapEntry(
@@ -331,10 +455,11 @@ class ApiService {
 
   // --- CONTENT METHODS ---
 
-  Future<List<CategoryModel>> getCategories({String? type}) async {
+  Future<List<CategoryModel>> getCategories({String? type, String? serviceType}) async {
     try {
       final queryParams = <String, dynamic>{};
       if (type != null) queryParams['type'] = type;
+      if (serviceType != null) queryParams['service_type'] = serviceType;
       
       final response = await _dio.get('/home/categories', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data['success'] == true) {
@@ -380,6 +505,23 @@ class ApiService {
       }
     } catch (e) {
       debugPrint('Error fetching products by category: $e');
+    }
+    return [];
+  }
+
+  Future<List<ProductModel>> getProducts({int? categoryId}) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (categoryId != null) queryParams['category_id'] = categoryId;
+      
+      final response = await _dio.get('/products', queryParameters: queryParams);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((p) => ProductModel.fromJson(p))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching global products: $e');
     }
     return [];
   }
@@ -558,5 +700,212 @@ class ApiService {
       }
       return {'success': false, 'message': 'Gagal terhubung ke server'};
     }
+  }
+
+  Future<List<ProductModel>> getDiscoveryProducts(String tag) async {
+    try {
+      final response = await _dio.get('/home/products/discovery', queryParameters: {'tag': tag});
+      if (response.statusCode == 200 && response.data['success']) {
+        return (response.data['data'] as List)
+            .map((p) => ProductModel.fromJson(p))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // --- STORE METHODS ---
+
+  Future<StoreDetailWrapper?> getStoreDetail(int id) async {
+    try {
+      final response = await _dio.get('/stores/$id');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return StoreDetailWrapper.fromJson(response.data['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching store detail: $e');
+      return null;
+    }
+  }
+
+  Future<List<ProductModel>> getStoreProductsPublic(int id, {int? categoryId, int? storeCategoryId, int page = 1}) async {
+    try {
+      String path = '/stores/$id/products?page=$page';
+      if (categoryId != null) {
+        path += '&category_id=$categoryId';
+      }
+      if (storeCategoryId != null) {
+        path += '&store_category_id=$storeCategoryId';
+      }
+      final response = await _dio.get(path);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List?)
+                ?.map((p) => ProductModel.fromJson(p))
+                .toList() ??
+            [];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching store products: $e');
+      return [];
+    }
+  }
+
+  Future<List<StoreCategoryModel>> getStoreCategoriesPublic(int storeId) async {
+    try {
+      final response = await _dio.get('/stores/$storeId');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data']['categories'] as List?)
+                ?.map((c) => StoreCategoryModel.fromJson(c))
+                .toList() ??
+            [];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching public categories: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteStoreCategory(int id) async {
+    try {
+      final response = await _dio.delete('/user/store/categories/$id');
+      return response.data;
+    } on DioException catch (e) {
+      return {'success': false, 'message': e.response?.data['message'] ?? 'Gagal menghapus etalase'};
+    }
+  }
+
+  Future<Map<String, dynamic>> assignProductsToCategory(int? categoryId, List<int> productIds) async {
+    try {
+      final response = await _dio.post('/user/store/categories/assign', data: {
+        'category_id': categoryId,
+        'product_ids': productIds,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      return {'success': false, 'message': e.response?.data['message'] ?? 'Gagal memindahkan produk'};
+    }
+  }
+
+  Future<Map<String, dynamic>> toggleFollowStore(int id) async {
+    try {
+      final response = await _dio.post('/user/stores/$id/follow');
+      if (response.data['success'] == true) {
+        return {'success': true, 'message': response.data['message'], 'is_following': response.data['data']['is_following']};
+      }
+      return {'success': false, 'message': response.data['message'] ?? 'Gagal memproses'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<bool> checkFollowStatus(int id) async {
+    if (!await isLoggedIn()) return false;
+    try {
+      final response = await _dio.get('/user/stores/$id/following');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['data']['is_following'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> createProductReview(int productId, int rating, String comment) async {
+    try {
+      final response = await _dio.post('/user/products/$productId/review', data: {
+        'rating': rating,
+        'comment': comment,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      return {'success': false, 'message': e.response?.data['message'] ?? 'Gagal mengirim ulasan'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<Map<String, dynamic>> checkReviewEligibility(int id) async {
+    if (!await isLoggedIn()) return {'success': true, 'data': {'can_review': false}};
+    try {
+      final response = await _dio.get('/user/products/$id/review/eligibility');
+      return response.data;
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server'};
+    }
+  }
+
+  Future<List<ReviewModel>> getProductReviews(int productId) async {
+    try {
+      final response = await _dio.get('/products/$productId/reviews');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List?)
+                ?.map((r) => ReviewModel.fromJson(r))
+                .toList() ??
+            [];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching product reviews: $e');
+      return [];
+    }
+  }
+
+  Future<ProductModel?> getProductDetail(int productId) async {
+    try {
+      final response = await _dio.get('/products/$productId');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return ProductModel.fromJson(response.data['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching product detail: $e');
+      return null;
+    }
+  }
+
+  // --- CHAT SYSTEM METHODS ---
+
+  Future<List<dynamic>> getConversations() async {
+    try {
+      final response = await _dio.get('/user/conversations');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['data'];
+      }
+    } catch (e) {
+      debugPrint('Error fetching conversations: $e');
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> getMessages(int conversationId) async {
+    try {
+      final response = await _dio.get('/user/conversations/$conversationId/messages');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['data'];
+      }
+    } catch (e) {
+      debugPrint('Error fetching messages: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> startConversation(int targetUserId) async {
+    try {
+      final response = await _dio.post('/user/conversations/start', data: {
+        'target_user_id': targetUserId,
+      });
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['data'];
+      }
+    } catch (e) {
+      debugPrint('Error starting conversation: $e');
+    }
+    return {};
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/app_alert.dart';
 
 class SecondHandScreen extends StatelessWidget {
   const SecondHandScreen({super.key});
@@ -230,9 +231,7 @@ class SecondHandScreen extends StatelessWidget {
         final product = products[index];
         return GestureDetector(
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Detail barang akan segera hadir!')),
-            );
+            AppAlert.info('Segera Hadir', 'Detail barang akan segera tersedia di LocalSecond!');
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 16),

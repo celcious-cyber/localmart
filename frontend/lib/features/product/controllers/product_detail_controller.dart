@@ -1,25 +1,66 @@
 import 'package:get/get.dart';
-import 'package:flutter/material.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../shared/models/home_data.dart';
+import '../../../shared/models/review_model.dart';
 import '../../cart/controllers/cart_controller.dart';
 import '../../checkout/screens/checkout_screen.dart';
 import '../../auth/widgets/auth_utils.dart';
+import '../../../core/services/api_service.dart';
 
 class ProductDetailController extends GetxController {
   final ProductModel product;
+  final _api = ApiService();
   
   ProductDetailController({required this.product});
 
   var selectedVariant = Rxn<ProductVariantModel>();
   var quantity = 1.obs;
   var userBalance = 0.obs;
+  var canReview = false.obs;
+  var reviews = <ReviewModel>[].obs;
+  var isLoadingReviews = false.obs;
+  var productDetail = Rxn<ProductModel>();
+  var isLoadingDetail = false.obs;
   
   bool get needsVariant => product.variants.isNotEmpty && selectedVariant.value == null;
 
   @override
   void onInit() {
     super.onInit();
+    productDetail.value = product; // Set initial data
     _loadUserBalance();
+    checkReviewEligibility();
+    fetchReviews();
+    fetchProductDetail();
+  }
+
+  Future<void> checkReviewEligibility() async {
+    final result = await _api.checkReviewEligibility(product.id);
+    if (result['success'] && result['data'] != null) {
+      canReview.value = result['data']['can_review'] ?? false;
+    }
+  }
+
+  Future<void> submitReview(int rating, String comment) async {
+    final result = await _api.createProductReview(product.id, rating, comment);
+    if (result['success']) {
+      AppAlert.success('Terima kasih!', 'Ulasanmu sangat membantu warga KSB lainnya.');
+      canReview.value = false; // Successfully reviewed
+      fetchReviews(); // Refresh list
+      fetchProductDetail(); // Refresh rating
+    } else {
+      AppAlert.error('Gagal', result['message']);
+    }
+  }
+
+  Future<void> fetchReviews() async {
+    isLoadingReviews.value = true;
+    try {
+      final list = await _api.getProductReviews(product.id);
+      reviews.assignAll(list);
+    } finally {
+      isLoadingReviews.value = false;
+    }
   }
 
   Future<void> _loadUserBalance() async {
@@ -86,14 +127,19 @@ class ProductDetailController extends GetxController {
     );
   }
 
+  Future<void> fetchProductDetail() async {
+    isLoadingDetail.value = true;
+    try {
+      final updated = await _api.getProductDetail(product.id);
+      if (updated != null) {
+        productDetail.value = updated;
+      }
+    } finally {
+      isLoadingDetail.value = false;
+    }
+  }
+
   void _showVariantError() {
-    Get.snackbar(
-      'Pilih Varian', 
-      'Silakan pilih varian produk terlebih dahulu',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.orange,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-    );
+    AppAlert.info('Pilih Varian', 'Silakan pilih varian produk terlebih dahulu');
   }
 }

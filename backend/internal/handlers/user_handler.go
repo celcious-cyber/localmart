@@ -3,7 +3,9 @@ package handlers
 import (
 	"crypto/rand"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +13,7 @@ import (
 	"github.com/ksb/localmart/backend/internal/middleware"
 	"github.com/ksb/localmart/backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type UserRegisterRequest struct {
@@ -112,16 +115,20 @@ func UserLogin(c *gin.Context) {
 		return
 	}
 
-	var user models.User
 	// Login bisa pakai Email atau Nomor HP
+	var user models.User
+	log.Printf("[Login] Attempt with identifier: '%s'", req.Identifier)
 	result := config.DB.Where("email = ? OR phone = ?", req.Identifier, req.Identifier).First(&user)
 	if result.Error != nil {
+		log.Printf("[Login] User not found for: '%s'", req.Identifier)
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Akun tidak ditemukan atau password salah"})
 		return
 	}
 
 	// Verifikasi Password
+	log.Printf("[Login Debug] Input: %s, Stored Hash: %s", req.Password, user.Password)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		log.Printf("[Login] Password mismatch for: '%s'", req.Identifier)
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Email/HP atau password salah"})
 		return
 	}
@@ -726,4 +733,216 @@ func generateOrderNumber() string {
 	hash := fmt.Sprintf("%X", b)
 	
 	return fmt.Sprintf("LM-%s-%s", timestamp, hash)
+}
+
+// ToggleFollowStore - POST /api/v1/user/stores/:id/follow
+func ToggleFollowStore(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	storeIDStr := c.Param("id")
+	storeID, _ := strconv.ParseUint(storeIDStr, 10, 32)
+
+	// 0. Validate ownership: User cannot follow their own store
+	var store models.Store
+	if err := config.DB.First(&store, storeID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Toko tidak ditemukan"})
+		return
+	}
+
+	if store.UserID == userID.(uint) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false, 
+			"message": "Ciee, mau follow diri sendiri ya? Enggak bisa dong!",
+		})
+		return
+	}
+
+	var follow models.StoreFollower
+	result := config.DB.Where("user_id = ? AND store_id = ?", userID, storeID).First(&follow)
+
+	if result.RowsAffected > 0 {
+		// Already following, unfollow
+		if err := config.DB.Delete(&follow).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal berhenti mengikuti toko"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Berhenti mengikuti toko",
+			"data":    gin.H{"is_following": false},
+		})
+	} else {
+		// Not following, follow
+		newFollow := models.StoreFollower{
+			UserID:  userID.(uint),
+			StoreID: uint(storeID),
+		}
+		if err := config.DB.Create(&newFollow).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal mengikuti toko"})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"success": true,
+			"message": "Berhasil mengikuti toko",
+			"data":    gin.H{"is_following": true},
+		})
+	}
+}
+
+// CheckFollowStatus - GET /api/v1/user/stores/:id/following
+func CheckFollowStatus(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	storeIDStr := c.Param("id")
+	storeID, _ := strconv.ParseUint(storeIDStr, 10, 32)
+
+	var count int64
+	config.DB.Model(&models.StoreFollower{}).Where("user_id = ? AND store_id = ?", userID, storeID).Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"is_following": count > 0},
+	})
+}
+
+// CreateProductReview - POST /api/v1/user/products/:id/review
+func CreateProductReview(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	productIDStr := c.Param("id")
+	productID, _ := strconv.ParseUint(productIDStr, 10, 32)
+
+	type ReviewRequest struct {
+		Rating  int    `json:"rating" binding:"required,min=1,max=5"`
+		Comment string `json:"comment" binding:"required"`
+	}
+
+	var req ReviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Rating (1-5) dan komentar wajib diisi"})
+		return
+	}
+
+	// 1. Strict Validation: User must have COMPLETED order for this product
+	var orderCount int64
+	config.DB.Table("orders").
+		Joins("JOIN order_items ON order_items.order_id = orders.id").
+		Where("orders.user_id = ? AND order_items.product_id = ? AND orders.status = ?", userID, productID, "COMPLETED").
+		Count(&orderCount)
+
+	if orderCount == 0 {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false, 
+			"message": "Anda hanya dapat mengulas produk yang sudah Anda beli dan diterima (COMPLETED).",
+		})
+		return
+	}
+
+	// 2. Prevent duplicate reviews
+	var existingReview int64
+	config.DB.Model(&models.Review{}).Where("user_id = ? AND product_id = ?", userID, productID).Count(&existingReview)
+	if existingReview > 0 {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "Anda sudah memberikan ulasan untuk produk ini"})
+		return
+	}
+
+	// 3. Atomic Updates using Transaction
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		// a. Create Review
+		review := models.Review{
+			ProductID: uint(productID),
+			UserID:    userID.(uint),
+			Rating:    req.Rating,
+			Comment:   req.Comment,
+		}
+		if err := tx.Create(&review).Error; err != nil {
+			return err
+		}
+
+		// b. Update Product Rating (Weighted Average)
+		var product models.Product
+		if err := tx.First(&product, productID).Error; err != nil {
+			return err
+		}
+
+		newProductReviewCount := product.ReviewCount + 1
+		newProductRating := ((product.Rating * float64(product.ReviewCount)) + float64(req.Rating)) / float64(newProductReviewCount)
+
+		if err := tx.Model(&product).Updates(map[string]interface{}{
+			"rating":       newProductRating,
+			"review_count": newProductReviewCount,
+		}).Error; err != nil {
+			return err
+		}
+
+		// c. Update Store Rating (Weighted Average)
+		if product.StoreID != 0 {
+			var store models.Store
+			if err := tx.First(&store, product.StoreID).Error; err != nil {
+				return err
+			}
+
+			newStoreReviewCount := store.ReviewCount + 1
+			newStoreRating := ((store.Rating * float64(store.ReviewCount)) + float64(req.Rating)) / float64(newStoreReviewCount)
+
+			if err := tx.Model(&store).Updates(map[string]interface{}{
+				"rating":       newStoreRating,
+				"review_count": newStoreReviewCount,
+			}).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal menyimpan ulasan"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": "Terima kasih! Ulasan Anda sangat berharga bagi warga KSB.",
+	})
+}
+
+// CheckReviewEligibility - GET /api/v1/user/products/:id/review/eligibility
+func CheckReviewEligibility(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	productIDStr := c.Param("id")
+	productID, _ := strconv.ParseUint(productIDStr, 10, 32)
+
+	// Check for COMPLETED order
+	var orderCount int64
+	config.DB.Table("orders").
+		Joins("JOIN order_items ON order_items.order_id = orders.id").
+		Where("orders.user_id = ? AND order_items.product_id = ? AND orders.status = ?", userID, productID, "COMPLETED").
+		Count(&orderCount)
+
+	// Check if already reviewed
+	var reviewCount int64
+	config.DB.Model(&models.Review{}).Where("user_id = ? AND product_id = ?", userID, productID).Count(&reviewCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"can_review":       orderCount > 0 && reviewCount == 0,
+			"has_purchased":    orderCount > 0,
+			"already_reviewed": reviewCount > 0,
+		},
+	})
+}
+
+// GetProductReviews - GET /api/v1/products/:id/reviews
+func GetProductReviews(c *gin.Context) {
+	productID := c.Param("id")
+
+	var reviews []models.Review
+	if err := config.DB.Preload("User").Where("product_id = ?", productID).Order("created_at desc").Find(&reviews).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal mengambil ulasan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    reviews,
+	})
 }

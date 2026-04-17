@@ -161,7 +161,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.65,
+                childAspectRatio: 0.7,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildProductCard(_products[index]),
@@ -259,7 +259,6 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Nama Produk
                   Text(
                     product.name,
                     maxLines: 2,
@@ -271,7 +270,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // 2. Harga
                   Text(
                     'Rp ${product.price.toStringAsFixed(0)}',
                     style: GoogleFonts.manrope(
@@ -281,43 +279,43 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // 3. Nama Toko
-                  Row(
-                    children: [
-                      const Icon(Icons.storefront_rounded, size: 12, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          product.store?.name ?? 'LocalMart',
-                          style: GoogleFonts.manrope(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: Colors.orange,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  // 4. Alamat
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_rounded, size: 12, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          product.store?.address ?? 'Sumbawa Barat',
+                        const SizedBox(width: 4),
+                        Text(
+                          '${product.rating}',
                           style: GoogleFonts.manrope(
-                            color: Colors.grey[500],
                             fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          '|',
+                          style: GoogleFonts.manrope(
+                            fontSize: 10,
+                            color: Colors.grey[300],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Terjual ${product.sold}',
+                          style: GoogleFonts.manrope(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

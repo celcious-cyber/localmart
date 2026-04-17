@@ -27,14 +27,19 @@ func Migrate(db *gorm.DB) {
 		&Favorite{},
 		&StoreFollower{},
 		&CartItem{},
+		&StoreCategory{},
+		&Conversation{},
+		&Message{},
+		&HelpCenter{},
 	)
 	if err != nil {
 		log.Fatal("Gagal auto-migrate database:", err)
 	}
+	
 	log.Println("Auto-migrate database berhasil!")
-
+	
 	// Seed data awal jika tabel kosong
-	seedData(db)
+	// seedData(db) // Dinonaktifkan: Gunakan cmd/seed/main.go untuk demo data
 }
 
 func seedData(db *gorm.DB) {

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/utils/app_alert.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../shared/models/store_models.dart';
 import '../admin/screens/location_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../auth/controllers/auth_controller.dart';
 
 class MyStoreScreen extends StatefulWidget {
   const MyStoreScreen({super.key});
@@ -23,6 +29,12 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
   StoreModel? _store;
   double? _latitude;
   double? _longitude;
+  
+  final ImagePicker _picker = ImagePicker();
+  Uint8List? _newLogoBytes;
+  Uint8List? _newBannerBytes;
+  String? _currentLogoUrl;
+  String? _currentBannerUrl;
 
   @override
   void initState() {
@@ -41,7 +53,28 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
         _addressController.text = _store!.address;
         _latitude = _store!.latitude;
         _longitude = _store!.longitude;
+        _currentLogoUrl = _store!.imageUrl;
+        _currentBannerUrl = _store!.bannerUrl;
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _pickImage(bool isLogo) async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: isLogo ? 512 : 1280,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        if (isLogo) {
+          _newLogoBytes = bytes;
+        } else {
+          _newBannerBytes = bytes;
+        }
       });
     }
   }
@@ -49,25 +82,49 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
     
-    final result = await ApiService().updateStoreProfile(
-      name: _nameController.text,
-      description: _descriptionController.text,
-      address: _addressController.text,
-      latitude: _latitude,
-      longitude: _longitude,
-    );
+    try {
+      // 1. Upload images if changed
+      String? logoUrl = _currentLogoUrl;
+      String? bannerUrl = _currentBannerUrl;
 
-    if (mounted) {
-      setState(() => _isSaving = false);
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-        );
-        Navigator.pop(context, true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-        );
+      if (_newLogoBytes != null) {
+        logoUrl = await ApiService().uploadImage(_newLogoBytes!, 'store_logo.jpg');
+      }
+      if (_newBannerBytes != null) {
+        bannerUrl = await ApiService().uploadImage(_newBannerBytes!, 'store_banner.jpg');
+      }
+
+      // 2. Update Profile & Settings
+      final result = await ApiService().updateStoreProfile(
+        name: _nameController.text,
+        description: _descriptionController.text,
+        address: _addressController.text,
+        latitude: _latitude,
+        longitude: _longitude,
+        imageUrl: logoUrl, // Basic profile still uses this
+      );
+
+      // Handle Banner via new settings endpoint if we want absolute sync
+      if (bannerUrl != null && bannerUrl != _currentBannerUrl) {
+         await ApiService().updateStoreSettings(bannerUrl: bannerUrl);
+      }
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+        if (result['success']) {
+          // Trigger global sync for profile photo
+          Get.find<AuthController>().refreshUser();
+          
+          AppAlert.success('Profil Diperbarui', 'Berhasil menyimpan perubahan identitas toko!');
+          Navigator.pop(context, true);
+        } else {
+          AppAlert.error('Gagal Menyimpan', result['message'] ?? 'Terjadi kesalahan');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        AppAlert.error('Error', 'Terjadi kesalahan sistem: $e');
       }
     }
   }
@@ -104,39 +161,102 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
   Widget _buildStoreHeader() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: Stack(
-          children: [
-            Container(
-              width: 100,
-              height: 100,
+      child: Column(
+        children: [
+          // Banner Area
+          GestureDetector(
+            onTap: () => _pickImage(false),
+            child: Container(
+              height: 160,
+              width: double.infinity,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.orange.withValues(alpha: 0.1),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
-                image: DecorationImage(
-                  image: NetworkImage(_store?.imageUrl.isNotEmpty == true 
-                    ? ApiService().getImageUrl(_store!.imageUrl) 
-                    : 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop'),
-                  fit: BoxFit.cover,
+                color: Colors.grey[200],
+                image: _newBannerBytes != null
+                    ? DecorationImage(image: MemoryImage(_newBannerBytes!), fit: BoxFit.cover)
+                    : (_currentBannerUrl != null && _currentBannerUrl!.isNotEmpty
+                        ? DecorationImage(image: CachedNetworkImageProvider(ApiService().getImageUrl(_currentBannerUrl!)), fit: BoxFit.cover)
+                        : null),
+              ),
+              child: Stack(
+                children: [
+                  if (_newBannerBytes == null && (_currentBannerUrl == null || _currentBannerUrl!.isEmpty))
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_a_photo_outlined, color: Colors.grey[400], size: 40),
+                          const SizedBox(height: 8),
+                          Text("Tambah Banner Toko", style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  Positioned(
+                    bottom: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Identity Area (Logo)
+          Transform.translate(
+            offset: const Offset(0, -40),
+            child: Center(
+              child: GestureDetector(
+                onTap: () => _pickImage(true),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: Colors.white, width: 4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        image: _newLogoBytes != null
+                          ? DecorationImage(image: MemoryImage(_newLogoBytes!), fit: BoxFit.cover)
+                          : DecorationImage(
+                              image: CachedNetworkImageProvider(_currentLogoUrl != null && _currentLogoUrl!.isNotEmpty
+                                ? ApiService().getImageUrl(_currentLogoUrl!)
+                                : 'https://ui-avatars.com/api/?name=${_store?.name ?? "Store"}&background=random'),
+                              fit: BoxFit.cover,
+                            ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -162,9 +282,111 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
           _buildTextField('Alamat Toko', _addressController, maxLines: 2),
           const SizedBox(height: 8),
           _buildCalibrationButton(),
+          const SizedBox(height: 40),
+
+          // Danger Zone
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red[100]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.dangerous_outlined, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Zona Berbahaya',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Hapus akun toko secara permanen. Tindakan ini tidak dapat dibatalkan.',
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.red[800]),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _showDeleteConfirmation,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Hapus Akun Toko', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _showDeleteConfirmation() {
+    if (_store == null) return;
+    
+    final nameController = TextEditingController();
+    final RxBool canDelete = false.obs;
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('Hapus Akun Toko?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Semua data produk, pesanan, dan ulasan akan hilang permanen.', style: GoogleFonts.poppins(fontSize: 13)),
+            const SizedBox(height: 20),
+            Text('Ketik nama toko "${_store!.name}" untuk konfirmasi:', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameController,
+              onChanged: (val) => canDelete.value = val.trim() == _store!.name.trim(),
+              decoration: InputDecoration(
+                hintText: 'Nama Toko',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Batal')),
+          Obx(() => ElevatedButton(
+            onPressed: canDelete.value ? _handleDelete : null,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Hapus Permanen'),
+          )),
+        ],
+      ),
+    );
+  }
+
+  void _handleDelete() async {
+    Get.back();
+    Get.dialog(const Center(child: CircularProgressIndicator(color: Colors.orange)), barrierDismissible: false);
+    
+    final result = await ApiService().deleteStore();
+    Get.back();
+
+    if (result['success']) {
+      AppAlert.success('Toko Dihapus', result['message']);
+      await AuthController.to.refreshUser();
+      Get.offAllNamed('/main');
+    } else {
+      AppAlert.error('Gagal Menghapus', result['message'] ?? 'Terjadi kesalahan');
+    }
   }
 
   Widget _buildCalibrationButton() {
@@ -186,9 +408,7 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
             _longitude = result.longitude;
           });
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lokasi berhasil dikalibrasi!')),
-            );
+            AppAlert.success('Kalibrasi', 'Lokasi peta berhasil diperbarui!');
           }
         }
       },

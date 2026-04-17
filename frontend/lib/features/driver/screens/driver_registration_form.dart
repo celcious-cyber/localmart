@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 
 class DriverRegistrationForm extends StatefulWidget {
@@ -160,14 +161,10 @@ class _DriverRegistrationFormState extends State<DriverRegistrationForm> {
         Navigator.pop(context); // Tutup loading
 
         if (result['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-          );
+          AppAlert.success('Pendaftaran Driver', result['message'] ?? 'Berhasil mendaftar mitra driver');
           widget.onRegister(_fullName, _plateNumber, _selectedVehicleType!);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-          );
+          AppAlert.error('Pendaftaran Gagal', result['message'] ?? 'Terjadi kesalahan saat pendaftaran');
         }
       }
     }

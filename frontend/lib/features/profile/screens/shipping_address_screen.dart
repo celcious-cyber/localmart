@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../core/services/api_service.dart';
 
@@ -157,9 +158,7 @@ class _ShippingAddressScreenState extends State<ShippingAddressScreen> {
       child: SafeArea(
         child: ElevatedButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Fitur Tambah Alamat segera hadir!')),
-            );
+            AppAlert.info('Segera Hadir', 'Fitur tambah alamat akan segera tersedia!');
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,

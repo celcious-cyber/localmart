@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../widgets/auth_utils.dart';
 import 'register_screen.dart';
-import '../../admin/screens/admin_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,10 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _rememberMe = true;
-
-  // Secret Admin Access State
-  int _logoTapCount = 0;
-  DateTime? _lastTapTime;
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -45,110 +41,18 @@ class _LoginScreenState extends State<LoginScreen> {
         if (result['success']) {
           AuthUtils.isLoggedIn = true;
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Berhasil masuk! Selamat datang, ${result['user'].fullName}',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
-              backgroundColor: AppColors.primary,
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppAlert.success(
+            'Berhasil',
+            'Selamat datang kembali, ${result['user'].fullName}',
           );
           Navigator.pop(context, true);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message']),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          AppAlert.error('Gagal Masuk', result['message'] ?? 'Periksa kembali data Anda');
         }
       }
     }
   }
 
-  void _handleLogoTap() {
-    final now = DateTime.now();
-    if (_lastTapTime == null || now.difference(_lastTapTime!) > const Duration(seconds: 2)) {
-      _logoTapCount = 1;
-    } else {
-      _logoTapCount++;
-    }
-    _lastTapTime = now;
-
-    if (_logoTapCount == 5) {
-      _logoTapCount = 0; // Reset
-      _showAdminPinDialog();
-    }
-  }
-
-  void _showAdminPinDialog() {
-    final pinController = TextEditingController();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Center(
-          child: Text(
-            'ADMIN ACCESS',
-            style: GoogleFonts.poppins(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Masukkan PIN Keamanan',
-              style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: pinController,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              maxLength: 4,
-              style: const TextStyle(color: Colors.white, fontSize: 24, letterSpacing: 10),
-              decoration: InputDecoration(
-                counterText: '',
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('BATAL', style: TextStyle(color: Colors.grey[400])),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (pinController.text == '1234') {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PIN Salah'), backgroundColor: Colors.red),
-                );
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
-            child: const Text('VERIFIKASI'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,20 +76,17 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Header & Logo Placeholder
                 Center(
-                  child: GestureDetector(
-                    onTap: _handleLogoTap,
-                    child: Container(
-                      height: 80,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        Icons.shopping_bag_rounded,
-                        size: 40,
-                        color: AppColors.primary,
-                      ),
+                  child: Container(
+                    height: 80,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      Icons.shopping_bag_rounded,
+                      size: 40,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),

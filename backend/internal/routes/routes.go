@@ -31,8 +31,27 @@ func SetupRoutes(router *gin.Engine) {
 			home.GET("/categories", handlers.GetCategories)
 			home.GET("/products/:slug", handlers.GetProductsByCategory)
 			home.GET("/discovery", handlers.GetDiscoveryTabs)
+			home.GET("/products/discovery", handlers.GetDiscoveryProducts)
 			home.GET("/search", handlers.GlobalSearch)
 		}
+
+		// Store Detail Endpoints (Public)
+		stores := v1.Group("/stores")
+		{
+			stores.GET("/:id", handlers.GetStoreDetail)
+			stores.GET("/:id/products", handlers.GetStoreProductsPublic)
+			stores.GET("/:id/reviews", handlers.GetProductReviews)
+		}
+
+		v1.GET("/store/constants", handlers.GetStoreConstants)
+
+		// Product Details & Reviews (Public)
+		v1.GET("/products", handlers.GetProducts)
+		v1.GET("/products/:id", handlers.GetProductDetail)
+		v1.GET("/products/:id/reviews", handlers.GetProductReviews)
+
+		// Help Center & FAQ
+		v1.GET("/help", handlers.GetHelpCenters)
 
 		// ══════════════════════════════════════════════
 		// USER AUTH & PROFILE ENDPOINTS
@@ -59,9 +78,18 @@ func SetupRoutes(router *gin.Engine) {
 			// Full Store Management
 			user.GET("/store/dashboard", handlers.GetStoreDashboard)
 			user.PATCH("/store/profile", handlers.UpdateStoreProfile)
+			user.PATCH("/store/settings", handlers.UpdateStoreSettings)
 			user.GET("/store/orders", handlers.GetStoreOrders)
 			user.PATCH("/store/orders/:id/status", handlers.UpdateOrderStatus)
+			user.DELETE("/store", handlers.DeleteStore)
 			user.POST("/upload", handlers.UploadImage)
+
+			// Store Custom Categories (Etalase)
+			user.GET("/store/categories", handlers.GetStoreCategories)
+			user.POST("/store/categories", handlers.CreateStoreCategory)
+			user.PUT("/store/categories/:id", handlers.UpdateStoreCategory)
+			user.DELETE("/store/categories/:id", handlers.DeleteStoreCategory)
+			user.POST("/store/categories/assign", handlers.AssignProductsToCategory)
 
 			// Favorites
 			user.GET("/favorites", handlers.GetFavorites)
@@ -76,7 +104,21 @@ func SetupRoutes(router *gin.Engine) {
 			// Checkout & Orders
 			user.POST("/checkout/calculate", handlers.CalculateCheckout)
 			user.POST("/checkout/create", handlers.CreateOrder)
+
+			// Store Interactions (Follow & Review)
+			user.POST("/stores/:id/follow", handlers.ToggleFollowStore)
+			user.GET("/stores/:id/following", handlers.CheckFollowStatus)
+			user.POST("/products/:id/review", handlers.CreateProductReview)
+			user.GET("/products/:id/review/eligibility", handlers.CheckReviewEligibility)
+
+			// Chat System
+			user.GET("/conversations", handlers.GetConversations)
+			user.GET("/conversations/:id/messages", handlers.GetMessages)
+			user.POST("/conversations/start", handlers.StartConversation)
 		}
+
+		// WebSocket Engine
+		v1.GET("/ws", middleware.AuthMiddleware(), handlers.HandleWebSocket)
 
 		// ══════════════════════════════════════════════
 		// ADMIN ENDPOINTS (untuk CMS Panel)
@@ -113,7 +155,7 @@ func SetupRoutes(router *gin.Engine) {
 
 			// Stores & Drivers
 			admin.GET("/stores", handlers.AdminGetStores)
-			admin.PATCH("/stores/:id/status", handlers.AdminUpdateStoreStatus)
+			admin.PUT("/stores/:id", handlers.AdminUpdateStore)
 			admin.GET("/drivers", handlers.AdminGetDrivers)
 			admin.PATCH("/drivers/:id/status", handlers.AdminUpdateDriverStatus)
 

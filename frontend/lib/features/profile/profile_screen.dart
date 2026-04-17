@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/utils/app_alert.dart';
 import '../home/home_screen.dart';
 import '../auth/widgets/auth_utils.dart';
 import '../auth/screens/login_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../store/my_store_screen.dart';
+import '../store/screens/manage_etalase_screen.dart';
 import '../store/screens/my_products_screen.dart';
 import '../store/screens/incoming_orders_screen.dart';
 import '../store/screens/store_stats_screen.dart';
@@ -13,7 +15,6 @@ import '../store/screens/store_registration_form.dart';
 import '../driver/screens/driver_registration_form.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/shipping_address_screen.dart';
-import 'screens/help_support_screen.dart';
 import 'screens/points_screen.dart';
 import 'screens/vouchers_screen.dart';
 import 'screens/user_settings_screen.dart';
@@ -24,6 +25,9 @@ import '../orders/orders_screen.dart';
 import '../../shared/models/user_model.dart';
 import '../../shared/models/store_models.dart';
 import '../../core/services/api_service.dart';
+import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../auth/controllers/auth_controller.dart';
 
 enum ProfileMode { buyer, seller, driver }
 
@@ -51,8 +55,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String registeredStoreName = '';
   String registeredDriverPlate = '';
 
-  UserModel? _user;
-  bool _isProfileLoading = false;
+  final authController = Get.find<AuthController>();
+
+  UserModel? get _user => authController.user.value;
+  bool get _isProfileLoading => authController.isLoading.value;
 
   @override
   void initState() {
@@ -60,11 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _checkLoginStatus();
   }
 
-  void _checkLoginStatus() async {
-    final loggedIn = await ApiService().isLoggedIn();
-    if (loggedIn) {
-      _loadUserData();
-    }
+  void _checkLoginStatus() {
+    // AuthController handles initial loading
   }
 
   Future<void> _loadStoreDashboard() async {
@@ -81,32 +84,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
-    if (!mounted) return;
-    setState(() => _isProfileLoading = true);
-    
-    try {
-      final user = await ApiService().getProfile();
-      if (mounted) {
-        setState(() {
-          _user = user;
-          _isProfileLoading = false;
-          
-          if (user == null) {
-            // Jika getProfile return null, kemungkinan sesi habis
-            AuthUtils.isLoggedIn = false;
-          } else if (user.store != null) {
-            _loadStoreDashboard();
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isProfileLoading = false;
-          AuthUtils.isLoggedIn = false;
-          _user = null;
-        });
-      }
+    await authController.refreshUser();
+    if (_user?.store != null) {
+      _loadStoreDashboard();
     }
   }
 
@@ -206,54 +186,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: _getModeColor().withValues(alpha: 0.1),
-                child: Icon(
-                  _getModeIcon(),
-                  size: 40,
-                  color: _getModeColor(),
+            Obx(() => Row(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _getModeColor().withValues(alpha: 0.1),
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: _buildProfileImage(),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_isProfileLoading)
-                      _buildLoadingPlaceholder(80, 18)
-                    else
-                      Row(
-                        children: [
-                          Text(
-                            _getProfileName(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_isProfileLoading)
+                        _buildLoadingPlaceholder(80, 18)
+                      else
+                        Row(
+                          children: [
+                            Text(
+                              _getProfileName(),
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                             ),
-                          ),
-                          if (currentMode == ProfileMode.seller && _user?.store?.status == 'approved') ...[
-                            const SizedBox(width: 8),
-                            _buildTierBadge(_user!.store!.level),
+                            if (currentMode == ProfileMode.seller && _user?.store?.status == 'approved') ...[
+                              const SizedBox(width: 8),
+                              _buildTierBadge(_user!.store!.level),
+                            ],
                           ],
-                        ],
-                      ),
-                    const SizedBox(height: 4),
-                    if (_isProfileLoading)
-                      _buildLoadingPlaceholder(120, 12)
-                    else
-                      Text(
-                        _getProfileSubtitle(),
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
-                      ),
-                  ],
+                        ),
+                      const SizedBox(height: 4),
+                      if (_isProfileLoading)
+                        _buildLoadingPlaceholder(120, 12)
+                      else
+                        Text(
+                          _getProfileSubtitle(),
+                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            )),
           if (AuthUtils.isLoggedIn) ...[
             const SizedBox(height: 24),
             // Toggle Switch Area (Triple Role)
@@ -366,6 +357,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+
+  Widget _buildProfileImage() {
+    String? imageUrl;
+    if (currentMode == ProfileMode.seller) {
+      imageUrl = _user?.store?.imageUrl;
+    } else {
+      imageUrl = _user?.avatarUrl;
+    }
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Icon(
+        _getModeIcon(),
+        size: 40,
+        color: _getModeColor(),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: ApiService().getImageUrl(imageUrl),
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: Colors.grey[100],
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Icon(
+        _getModeIcon(),
+        size: 40,
+        color: _getModeColor(),
       ),
     );
   }
@@ -525,7 +553,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               final navigator = Navigator.of(context);
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
               
               await ApiService().logout();
               AuthUtils.isLoggedIn = false; // Reset state guest
@@ -535,13 +562,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 navigator.pushReplacement(
                   MaterialPageRoute(builder: (context) => const HomeScreen()), // Kembali ke HomeScreen
                 );
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Anda telah berhasil keluar.', style: GoogleFonts.poppins()),
-                    backgroundColor: Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                AppAlert.success('Logout', 'Anda telah berhasil keluar dari aplikasi.');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -563,12 +584,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal membuka halaman: $urlString', style: GoogleFonts.poppins()),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppAlert.error('Gagal Membuka', 'Gagal membuka halaman: $urlString');
       }
     }
   }
@@ -624,23 +640,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }),
 
       _buildSectionHeader('Pusat Bantuan & Info'),
-      _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan & Laporan', 'Pusat bantuan pelanggan', Colors.purple, onTapCallback: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpSupportScreen()));
+      _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan Center', 'Pusat bantuan pelanggan', Colors.purple, onTapCallback: () {
+        Get.toNamed('/help-center');
       }),
       _buildMenuItem(Icons.info_outline_rounded, 'Tentang LocalMart', 'Kenali lebih dekat platform kami', Colors.blue, onTapCallback: () => _launchUrl('https://localmart.id/tentang')),
       _buildMenuItem(Icons.description_outlined, 'Syarat & Ketentuan', 'Aturan penggunaan layanan', Colors.orange, onTapCallback: () => _launchUrl('https://localmart.id/snk')),
       _buildMenuItem(Icons.privacy_tip_outlined, 'Kebijakan Privasi', 'Bagaimana kami menjaga data Anda', Colors.teal, onTapCallback: () => _launchUrl('https://localmart.id/privacy')),
       _buildMenuItem(Icons.share_outlined, 'Ajak Teman', 'Bagikan keseruan belanja LocalMart', Colors.indigo, isLast: true, onTapCallback: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fitur referral segera hadir!', style: GoogleFonts.poppins())),
-        );
+        AppAlert.info('Segera Hadir', 'Fitur referral akan segera tersedia!');
       }),
 
       _buildSectionHeader('Pengaturan Akun'),
       _buildMenuItem(Icons.security_outlined, 'Keamanan Akun', 'Password, PIN & Verifikasi', Colors.blueGrey, onTapCallback: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Menu keamanan segera hadir!', style: GoogleFonts.poppins())),
-        );
+        AppAlert.info('Segera Hadir', 'Menu keamanan akan segera tersedia!');
       }),
       if (AuthUtils.isLoggedIn)
         _buildMenuItem(Icons.logout, 'Keluar', 'Akhiri sesi belanja', Colors.red, isLast: true, onTapCallback: _handleLogout)
@@ -661,6 +673,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildMenuItem(Icons.inventory_2_outlined, 'Produk Saya', 'Kelola barang jualan Anda', Colors.orange, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const MyProductsScreen()));
       }),
+      _buildMenuItem(Icons.category_outlined, 'Kelola Etalase', 'Atur kategori koleksi produk Anda', Colors.deepPurple, onTapCallback: () {
+        final storeId = _user?.store?.id;
+        if (storeId != null) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => ManageEtalaseScreen(storeId: storeId)));
+        } else {
+          AppAlert.error('Error', 'Toko tidak ditemukan');
+        }
+      }),
       _buildMenuItem(Icons.list_alt_rounded, 'Pesanan Masuk', 'Proses pesanan dari pembeli', Colors.blue, onTapCallback: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const IncomingOrdersScreen()));
       }),
@@ -668,12 +688,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreStatsScreen()));
       }),
       _buildMenuItem(Icons.storefront_outlined, 'Pengaturan Toko', 'Ubah profil dan jam operasional', Colors.indigo, isLast: true, onTapCallback: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const MyStoreScreen()));
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const MyStoreScreen())).then((val) {
+          if (val == true) {
+            _loadStoreDashboard();
+            _loadUserData();
+          }
+        });
       }),
 
       _buildSectionHeader('Pusat Bantuan & Info'),
-      _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan Center', 'Pusat bantuan penjual', Colors.purple, onTapCallback: () {}),
-      _buildMenuItem(Icons.info_outline_rounded, 'Panduan Berjualan', 'Tips jualan laris di LocalMart', Colors.blue, isLast: true, onTapCallback: () {}),
+      _buildMenuItem(Icons.headset_mic_outlined, 'Bantuan Center', 'Pusat bantuan penjual', Colors.purple, onTapCallback: () {
+        Get.toNamed('/help-center');
+      }),
+      _buildMenuItem(Icons.info_outline_rounded, 'Panduan Berjualan', 'Tips jualan laris di LocalMart', Colors.blue, isLast: true, onTapCallback: () {
+        Get.toNamed('/selling-guide');
+      }),
 
       _buildSectionHeader('Pengaturan Akun'),
       _buildMenuItem(Icons.logout, 'Keluar', 'Akhiri sesi jualan', Colors.red, isLast: true, onTapCallback: _handleLogout),
@@ -737,9 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           trailing: trailingWidget ?? const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
           onTap: onTapCallback ??
               () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Menu $title segera hadir!')),
-                );
+                AppAlert.info('Segera Hadir', 'Menu $title akan segera tersedia!');
               },
         ),
         if (!isLast) Divider(height: 1, indent: 70, endIndent: 20, color: Colors.grey[100]),
@@ -946,9 +973,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Silakan hubungi CS untuk pendaftaran ulang.'))
-                  );
+                    AppAlert.info('Hubungi CS', 'Silakan hubungi Customer Service untuk pendaftaran ulang.');
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.red),

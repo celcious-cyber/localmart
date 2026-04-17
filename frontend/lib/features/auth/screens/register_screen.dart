@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -40,25 +41,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         });
 
         if (result['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Pendaftaran berhasil! Selamat datang, ${result['user'].fullName}',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppAlert.success(
+            'Berhasil',
+            'Pendaftaran berhasil! Selamat datang, ${result['user'].fullName}',
           );
           Navigator.pop(context, true);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message']),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          AppAlert.error('Gagal Daftar', result['message'] ?? 'Periksa kembali data Anda');
         }
       }
     }

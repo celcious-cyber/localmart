@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 
@@ -52,21 +52,15 @@ class CartController extends GetxController {
         HapticFeedback.lightImpact();
         cartUpdateSignal.value++;
         
-        Get.snackbar(
+        AppAlert.success(
           'Berhasil',
           '${product.name} dimasukkan ke keranjang',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
         );
         fetchCart(); // Refresh cart list
       } else {
-        Get.snackbar(
+        AppAlert.error(
           'Gagal',
           result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
         );
       }
     } finally {
@@ -90,12 +84,9 @@ class CartController extends GetxController {
           cartItems[index] = result['data'];
         }
       } else {
-        Get.snackbar(
+        AppAlert.info(
           'Opps!',
           result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
         );
       }
     } finally {

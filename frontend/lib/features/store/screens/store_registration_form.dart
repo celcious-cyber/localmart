@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
-import '../../../shared/models/home_data.dart';
+import 'package:get/get.dart';
+import '../controllers/registration_controller.dart';
 
 class StoreRegistrationForm extends StatefulWidget {
   final Function(String storeName, String category) onRegister;
@@ -14,25 +16,23 @@ class StoreRegistrationForm extends StatefulWidget {
 
 class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
   final _formKey = GlobalKey<FormState>();
-  String _storeName = '';
-  String _address = '';
-  String? _selectedCategory;
+  final RegistrationController _regController = Get.put(RegistrationController(), permanent: true);
   
-  List<CategoryModel> _apiCategories = [];
-  bool _isLoadingCategories = true;
+  List<Map<String, String>> _businessModules = [];
+  bool _isLoadingModules = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchCategories();
+    _fetchModules();
   }
 
-  Future<void> _fetchCategories() async {
-    final cats = await ApiService().getCategories();
+  Future<void> _fetchModules() async {
+    final modules = await ApiService().getStoreConstants();
     if (mounted) {
       setState(() {
-        _apiCategories = cats;
-        _isLoadingCategories = false;
+        _businessModules = modules;
+        _isLoadingModules = false;
       });
     }
   }
@@ -73,27 +73,56 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
             const SizedBox(height: 40),
             _buildLabel('Nama Toko'),
             TextFormField(
+              initialValue: _regController.storeName.value,
               decoration: _inputDecoration('Contoh: Bakso Taliwang Berkah'),
               validator: (v) => v == null || v.isEmpty ? 'Nama toko wajib diisi' : null,
-              onSaved: (v) => _storeName = v ?? '',
+              onChanged: (v) => _regController.updateStoreName(v),
             ),
             const SizedBox(height: 20),
-            _buildLabel('Kategori Bisnis'),
-            _isLoadingCategories
-                ? const Center(child: CircularProgressIndicator())
-                : DropdownButtonFormField<String>(
-                    decoration: _inputDecoration('Pilih kategori'),
-                    items: _apiCategories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                    validator: (v) => v == null ? 'Pilih satu kategori' : null,
+            _buildLabel('Kategori Bisnis (Pilih minimal satu)'),
+            _isLoadingModules
+                ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+                : Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Obx(() => Column(
+                      children: _businessModules.map((m) {
+                        final code = m['code']!;
+                        final name = m['name']!;
+                        final isSelected = _regController.selectedModules.contains(code);
+                        return CheckboxListTile(
+                          title: Text(
+                            name,
+                            softWrap: true,
+                            style: GoogleFonts.poppins(fontSize: 14),
+                          ),
+                          activeColor: Colors.orange,
+                          value: isSelected,
+                          onChanged: (_) => _regController.toggleModule(code),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        );
+                      }).toList(),
+                    )),
                   ),
+            Obx(() => (!_isLoadingModules && _regController.selectedModules.isEmpty)
+               ? Padding(
+                 padding: const EdgeInsets.only(top: 8, left: 16),
+                 child: Text('Pilih minimal 1 kategori bisnis', style: TextStyle(color: Colors.red[700], fontSize: 12)),
+               )
+               : const SizedBox.shrink()),
             const SizedBox(height: 20),
             _buildLabel('Alamat Lengkap Toko'),
             TextFormField(
+              initialValue: _regController.address.value,
               maxLines: 2,
               decoration: _inputDecoration('Contoh: Jl. Raya KM 01, Taliwang'),
               validator: (v) => v == null || v.isEmpty ? 'Alamat wajib diisi' : null,
-              onSaved: (v) => _address = v ?? '',
+              onChanged: (v) => _regController.updateAddress(v),
             ),
             const SizedBox(height: 40),
             SizedBox(
@@ -153,8 +182,11 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      
+      if (_regController.selectedModules.isEmpty) {
+        AppAlert.info('Kategori Bisnis', 'Silakan pilih minimal 1 kategori bisnis untuk toko Anda');
+        return;
+      }
+
       // Tampilkan loading
       showDialog(
         context: context,
@@ -163,23 +195,26 @@ class _StoreRegistrationFormState extends State<StoreRegistrationForm> {
       );
 
       final result = await ApiService().registerStore(
-        name: _storeName,
-        category: _selectedCategory!,
-        address: _address,
+        name: _regController.storeName.value,
+        category: _regController.selectedModules.isNotEmpty ? _businessModules.firstWhere((m) => m['code'] == _regController.selectedModules.first)['name']! : '',
+        serviceTypes: _regController.selectedModules.toList(),
+        address: _regController.address.value,
       );
 
       if (mounted) {
         Navigator.pop(context); // Tutup loading
 
         if (result['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-          );
-          widget.onRegister(_storeName, _selectedCategory!);
+          AppAlert.success('Toko Berhasil Dibuka', result['message'] ?? 'Selamat mulai berbisnis!');
+          final name = _regController.storeName.value;
+          final categories = _regController.selectedModules.join(', ');
+          
+          // RESET LOGIC: Clear form only on success
+          _regController.clearForm();
+          
+          widget.onRegister(name, categories);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-          );
+          AppAlert.error('Pendaftaran Gagal', result['message'] ?? 'Terjadi kesalahan saat membuka toko');
         }
       }
     }

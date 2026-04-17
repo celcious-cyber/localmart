@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/admin_service.dart';
 import 'admin_dashboard_screen.dart';
 
@@ -18,9 +19,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   void _handleAdminLogin() async {
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username dan password wajib diisi'), backgroundColor: Colors.red),
-      );
+      AppAlert.error('Input Kosong', 'Username dan password wajib diisi');
       return;
     }
 
@@ -38,9 +37,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-        );
+        AppAlert.error('Login Gagal', result['message'] ?? 'Username atau password salah');
       }
     }
   }

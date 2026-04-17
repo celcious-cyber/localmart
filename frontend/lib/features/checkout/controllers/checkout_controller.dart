@@ -1,6 +1,7 @@
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 import '../../cart/controllers/cart_controller.dart';
@@ -60,7 +61,17 @@ class CheckoutController extends GetxController {
     _loadUserBalance();
     
     // Auto-recalculate when using points or shipping method changes
-    ever(usePoints, (_) => calculateTotals());
+    ever(usePoints, (bool val) {
+      if (val && userPoints.value <= 0) {
+        usePoints.value = false;
+        AppAlert.info(
+          'LocalPoint', 
+          'Yah, poin kamu masih kosong nih. Kumpulkan poin dulu yuk!',
+        );
+        return;
+      }
+      calculateTotals();
+    });
     ever(selectedShippingMethod, (_) => calculateTotals());
   }
 
@@ -111,8 +122,7 @@ class CheckoutController extends GetxController {
         totalAmount.value = double.tryParse(data?['total_amount']?.toString() ?? '0') ?? 0.0;
         
         if (appliedVoucherCode.value.isNotEmpty && voucherDiscount.value == 0) {
-          Get.snackbar('Voucher', 'Kode voucher tidak valid atau syarat tidak terpenuhi', 
-              backgroundColor: Colors.orange, colorText: Colors.white);
+          AppAlert.info('Voucher', 'Kode voucher tidak valid atau syarat tidak terpenuhi');
           appliedVoucherCode.value = "";
           voucherController.clear();
         }
@@ -157,8 +167,7 @@ class CheckoutController extends GetxController {
   Future<void> createOrder() async {
     // Validation
     if (!isPhysical && selectedDateTime.value == null) {
-      Get.snackbar('Opps!', 'Silakan pilih waktu layanan terlebih dahulu', 
-          backgroundColor: Colors.orange, colorText: Colors.white);
+      AppAlert.info('Opps!', 'Silakan pilih waktu layanan terlebih dahulu');
       return;
     }
 
@@ -191,8 +200,7 @@ class CheckoutController extends GetxController {
           orderNumber: result['data']['order_number'],
         ));
       } else {
-        Get.snackbar('Gagal', result['message'], 
-            backgroundColor: Colors.red, colorText: Colors.white);
+        AppAlert.error('Gagal', result['message'] ?? 'Terjadi kesalahan');
       }
     } finally {
       isLoading.value = false;

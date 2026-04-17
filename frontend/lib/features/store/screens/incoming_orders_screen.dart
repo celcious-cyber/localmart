@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/store_models.dart';
 
@@ -53,14 +54,10 @@ class _IncomingOrdersScreenState extends State<IncomingOrdersScreen> with Single
     if (mounted) {
       Navigator.pop(context); // Tutup loading
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-        );
+        AppAlert.success('Update Status', result['message'] ?? 'Status pesanan berhasil diperbarui');
         _loadAllOrders(); // Refresh
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-        );
+        AppAlert.error('Update Gagal', result['message'] ?? 'Terjadi kesalahan saat memperbarui status');
       }
     }
   }

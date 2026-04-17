@@ -3,10 +3,14 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/utils/app_alert.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
+import '../../../shared/models/store_models.dart';
 import '../../../core/theme/app_colors.dart';
+import 'package:get/get.dart';
+import '../controllers/add_product_controller.dart';
 
 class AddProductScreen extends StatefulWidget {
   final ProductModel? product;
@@ -21,7 +25,13 @@ class AddProductScreen extends StatefulWidget {
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _api = ApiService();
+  final AddProductController _prodController = Get.put(AddProductController(), permanent: true);
+  
   late String _productType;
+  String _serviceType = 'mart';
+  bool _isFetchingCategories = false;
+  List<String> _storeModules = [];
+  List<Map<String, String>> _allModules = [];
   
   // Controllers
   final _nameController = TextEditingController();
@@ -54,14 +64,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
   List<CategoryModel> _categories = [];
   List<ProductVariantModel> _variants = [];
   
+  // Store Categories (Etalase) Logic
+  List<StoreCategoryModel> _selectedStoreCategories = [];
+  List<StoreCategoryModel> _storeCategories = [];
+
   bool _isLoading = true;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _productType = widget.initialType ?? widget.product?.productType ?? 'BARANG';
     
+    // Check if we are editing or continuing from previous state
+    if (widget.product != null) {
+      _prodController.setFromProduct(widget.product!);
+    }
+    
+    _productType = widget.initialType ?? _prodController.productType.value;
+    _serviceType = _prodController.serviceType.value;
+    
+    // Sync UI controllers with GetX state
+    _nameController.text = _prodController.name.value;
+    _priceController.text = _prodController.price.value;
+    _descriptionController.text = _prodController.description.value;
+    _selectedCategory = _prodController.selectedCategory.value;
+    _selectedStoreCategories = List.from(_prodController.selectedStoreCategories);
+
+    // Listeners for persistence
+    _nameController.addListener(() => _prodController.name.value = _nameController.text);
+    _priceController.addListener(() => _prodController.price.value = _priceController.text);
+    _descriptionController.addListener(() => _prodController.description.value = _descriptionController.text);
+    
+    // If we're coming from a specific screen (e.g. LocalFood), we might want to pre-select serviceType
+    // This will be handled by the caller or inferred from type if needed.
     if (widget.product != null) {
       final p = widget.product!;
       _nameController.text = p.name;
@@ -97,20 +132,84 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-    final cats = await _api.getCategories(type: _productType);
+    
+    // Fetch store modules from dashboard
+    final dashboard = await _api.getStoreDashboard();
+    if (dashboard != null) {
+      _storeModules = dashboard.store.businessModules;
+      // Auto-set serviceType if only one module and it's a new product
+      if (_storeModules.length == 1 && widget.product == null) {
+        _serviceType = _storeModules.first;
+      }
+    }
+
+    // Fetch all module constants for labels
+    final modules = await _api.getStoreConstants();
+    _allModules = modules;
+
+    // Fetch store categories (etalase)
+    final storeCats = await _api.getStoreCategories();
+    _storeCategories = storeCats;
+    
+    // Fetch module categories
+    final cats = await _api.getCategories(serviceType: _serviceType);
+
     if (mounted) {
       setState(() {
         _categories = cats;
         if (widget.product != null) {
           _selectedCategory = _categories.firstWhere(
             (c) => c.id == widget.product!.categoryId, 
-            orElse: () => _categories.isNotEmpty ? _categories.first : CategoryModel(id: 0, name: 'Pilih Kategori', slug: '', iconName: '', type: 'BARANG', sortOrder: 0, isActive: true, products: [])
+            orElse: () => _categories.isNotEmpty ? _categories.first : CategoryModel(id: 0, name: 'Pilih Kategori', slug: '', iconName: '', type: 'BARANG', serviceType: 'mart', sortOrder: 0, isActive: true, products: [])
           );
+          
+          if (widget.product!.storeCategories.isNotEmpty) {
+             _selectedStoreCategories = List.from(widget.product!.storeCategories);
+          }
         } else if (_categories.isNotEmpty) {
-           _selectedCategory = null; // Clear if adding new to prevent wrong cat
+           _selectedCategory = null; 
         }
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _onServiceTypeChanged(String? val) async {
+    if (val == null || val == _serviceType) return;
+    
+    setState(() {
+      _serviceType = val;
+      _prodController.serviceType.value = val;
+      _isFetchingCategories = true;
+      _selectedCategory = null; 
+      _prodController.selectedCategory.value = null;
+
+      // Auto-map productType to show correct fields
+      if (['mart', 'food', 'umkm', 'bumi', 'second'].contains(val)) {
+        _productType = 'BARANG';
+      } else if (['jasa', 'transport'].contains(val)) {
+        _productType = 'JASA';
+      } else if (['rental', 'kost'].contains(val)) {
+        _productType = 'RENTAL';
+      } else if (['wisata'].contains(val)) {
+        _productType = 'WISATA';
+      }
+      _prodController.productType.value = _productType;
+    });
+
+    try {
+      final cats = await _api.getCategories(serviceType: val);
+      if (mounted) {
+        setState(() {
+          _categories = cats;
+          _isFetchingCategories = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingCategories = false);
+        AppAlert.error('Gagal', 'Gagal memuat kategori untuk modul ini');
+      }
     }
   }
 
@@ -125,10 +224,41 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
   }
 
+  void _confirmReset() {
+    AppAlert.confirm(
+      Get.context!,
+      'Reset Form?',
+      'Semua data yang sudah Anda isi akan dihapus dan kembali kosong.',
+      confirmText: 'Ya, Reset',
+      onConfirm: () {
+        _prodController.clear();
+        setState(() {
+          _nameController.clear();
+          _priceController.clear();
+          _descriptionController.clear();
+          _stockController.text = '0';
+          _brandController.clear();
+          _skuController.clear();
+          _minOrderController.text = '1';
+          _weightController.text = '0';
+          _lengthController.text = '0';
+          _widthController.text = '0';
+          _heightController.text = '0';
+          _condition = 'Baru';
+          _selectedCategory = null;
+          _selectedFiles.clear();
+          _imageBytesCache.clear();
+          _variants.clear();
+          _selectedStoreCategories.clear();
+        });
+      }
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_existingUrls.isEmpty && _selectedFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unggah minimal 1 foto')));
+      AppAlert.info('Foto Produk', 'Unggah minimal 1 foto produk agar pembeli tertarik');
       return;
     }
     if (_selectedCategory == null) return;
@@ -161,6 +291,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'sku': _skuController.text,
         'min_order': _minOrderController.text,
         'product_type': _productType,
+        'service_type': _serviceType,
         'metadata': jsonEncode(meta),
         'variants': jsonEncode(_variants),
         'existing_images': jsonEncode(_existingUrls),
@@ -171,6 +302,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         productData['length'] = _lengthController.text;
         productData['width'] = _widthController.text;
         productData['height'] = _heightController.text;
+      }
+
+      if (_selectedStoreCategories.isNotEmpty) {
+        productData['store_category_ids[]'] = _selectedStoreCategories.map((sc) => sc.id.toString()).toList();
+      } else {
+        productData['store_category_ids[]'] = []; // For backend to clear
       }
 
       // 3. Image Upload
@@ -188,14 +325,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       if (mounted) {
+        // Close loading
+        Navigator.pop(context);
+
         if (result['success']) {
+          AppAlert.success(
+            widget.product == null ? 'Produk Ditambahkan' : 'Produk Diperbarui',
+            result['message']
+          );
+          
+          // RESET LOGIC: Clear controller state only on success
+          _prodController.clear();
+          
           Navigator.pop(context, true);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Gagal menyimpan')));
+          AppAlert.error('Gagal', result['message'] ?? 'Terjadi kesalahan saat menyimpan produk');
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppAlert.error('Terjadi Kesalahan', e.toString());
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -213,6 +361,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
+        actions: [
+          if (widget.product == null)
+            TextButton(
+              onPressed: _confirmReset,
+              child: Text('Reset', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w600)),
+            ),
+        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Colors.orange))
@@ -226,22 +381,76 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   _buildImageSection(),
                   const SizedBox(height: 32),
                   
-                  _buildLabel('Nama ${_getTypeLabel()}'),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: _inputDecoration('Contoh: ${_getNameExample()}'),
-                    validator: (v) => v == null || v.isEmpty ? 'Wajib diisi' : null,
+                  _buildLabel('Modul / Layanan (Terkunci jika hanya memiliki 1 modul)'),
+                  DropdownButtonFormField<String>(
+                    initialValue: _serviceType,
+                    isExpanded: true,
+                    decoration: _inputDecoration('Pilih Modul'),
+                    items: _allModules
+                        .where((m) => _storeModules.contains(m['code']))
+                        .map((m) => DropdownMenuItem(
+                              value: m['code'],
+                              child: Text(
+                                m['name']!,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ))
+                        .toList(),
+                    // Tampilkan semua jika data modulenya belum termuat (fallback)
+                    onChanged: _storeModules.length <= 1 ? null : _onServiceTypeChanged,
+                    validator: (v) => v == null ? 'Wajib dipilih' : null,
                   ),
                   const SizedBox(height: 20),
                   
                   _buildLabel('Kategori'),
-                  DropdownButtonFormField<CategoryModel>(
-                    initialValue: _selectedCategory,
-                    decoration: _inputDecoration('Pilih kategori'),
-                    items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                    validator: (v) => v == null ? 'Wajib dipilih' : null,
-                  ),
+                    DropdownButtonFormField<CategoryModel>(
+                      initialValue: _selectedCategory,
+                      isExpanded: true,
+                      decoration: _inputDecoration(_isFetchingCategories ? 'Memuat kategori...' : 'Pilih kategori'),
+                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name, overflow: TextOverflow.ellipsis))).toList(),
+                      onChanged: _isFetchingCategories ? null : (v) {
+                        setState(() => _selectedCategory = v);
+                        _prodController.selectedCategory.value = v;
+                      },
+                      validator: (v) => v == null ? 'Wajib dipilih' : null,
+                      hint: _isFetchingCategories 
+                        ? const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2)) 
+                        : const Text('Pilih kategori'),
+                    ),
+                  const SizedBox(height: 20),
+
+                  _buildLabel('Pilih Etalase Toko (Bisa lebih dari satu)'),
+                  const SizedBox(height: 8),
+                  if (_storeCategories.isEmpty)
+                    Text('Anda belum membuat etalase khusus.', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _storeCategories.map((sc) {
+                        final isSelected = _selectedStoreCategories.any((s) => s.id == sc.id);
+                        return FilterChip(
+                          label: Text(sc.name, style: GoogleFonts.poppins(fontSize: 12, color: isSelected ? Colors.white : Colors.black87)),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedStoreCategories.add(sc);
+                                _prodController.selectedStoreCategories.add(sc);
+                              } else {
+                                _selectedStoreCategories.removeWhere((s) => s.id == sc.id);
+                                _prodController.selectedStoreCategories.removeWhere((s) => s.id == sc.id);
+                              }
+                            });
+                          },
+                          backgroundColor: Colors.grey[100],
+                          selectedColor: AppColors.primary,
+                          checkmarkColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        );
+                      }).toList(),
+                    ),
                   const SizedBox(height: 20),
 
                   if (_productType == 'BARANG') ...[
@@ -384,7 +593,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
   InputDecoration _inputDecoration(String h) => InputDecoration(hintText: h, filled: true, fillColor: const Color(0xFFF8F9FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none));
   
   String _getTypeLabel() => _productType == 'BARANG' ? 'Barang' : _productType == 'JASA' ? 'Jasa' : _productType == 'RENTAL' ? 'Sewa' : 'Wisata';
-  String _getNameExample() => _productType == 'BARANG' ? 'Kopi Tepal' : _productType == 'JASA' ? 'Service AC' : _productType == 'RENTAL' ? 'Rental Mobil' : 'Paket Tour';
 
   Widget _buildConditionButton(String label) {
     bool isSelected = _condition == label;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 
@@ -44,12 +45,9 @@ class FavoritesController extends GetxController {
   Future<void> toggleFavorite(ProductModel product) async {
     // 1. Check Login
     if (!await _api.isLoggedIn()) {
-      Get.snackbar(
+      AppAlert.info(
         'Perlu Login',
         'Silakan login untuk menyimpan produk favorit Anda',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
       );
       return;
     }
@@ -76,13 +74,9 @@ class FavoritesController extends GetxController {
         loadFavorites();
       }
       
-      Get.snackbar(
+      AppAlert.success(
         'Berhasil',
         result['message'],
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 1),
       );
     } else {
       // Revert optimistic update on failure
@@ -94,12 +88,9 @@ class FavoritesController extends GetxController {
         favorites.removeWhere((p) => p.id == product.id);
       }
       
-      Get.snackbar(
+      AppAlert.error(
         'Gagal',
         result['message'],
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
       );
     }
   }

@@ -130,7 +130,12 @@ func AdminDeleteBanner(c *gin.Context) {
 // AdminGetCategories - GET /api/v1/admin/categories
 func AdminGetCategories(c *gin.Context) {
 	var categories []models.Category
-	config.DB.Order("sort_order ASC").Find(&categories)
+	serviceType := c.Query("service_type")
+	query := config.DB.Order("sort_order ASC")
+	if serviceType != "" {
+		query = query.Where("service_type = ?", serviceType)
+	}
+	query.Find(&categories)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": categories})
 }
 
@@ -141,6 +146,12 @@ func AdminCreateCategory(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid: " + err.Error()})
 		return
 	}
+
+	if category.ServiceType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Modul / Service Type wajib diisi"})
+		return
+	}
+
 	config.DB.Create(&category)
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": category})
 }
@@ -157,6 +168,12 @@ func AdminUpdateCategory(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid"})
 		return
 	}
+
+	if category.ServiceType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Modul / Service Type wajib diisi"})
+		return
+	}
+
 	config.DB.Save(&category)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": category})
 }
@@ -195,6 +212,22 @@ func AdminCreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid: " + err.Error()})
 		return
 	}
+
+	// Data Integrity Validation
+	var category models.Category
+	if err := config.DB.First(&category, product.CategoryID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Kategori tidak ditemukan"})
+		return
+	}
+	
+	if category.ServiceType != product.ServiceType {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false, 
+			"message": fmt.Sprintf("Kategori '%s' tidak berelasi dengan modul '%s'", category.Name, product.ServiceType),
+		})
+		return
+	}
+
 	config.DB.Create(&product)
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": product})
 }
@@ -211,6 +244,22 @@ func AdminUpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Data tidak valid"})
 		return
 	}
+
+	// Data Integrity Validation
+	var category models.Category
+	if err := config.DB.First(&category, product.CategoryID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Kategori tidak ditemukan"})
+		return
+	}
+	
+	if category.ServiceType != product.ServiceType {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false, 
+			"message": fmt.Sprintf("Kategori '%s' tidak berelasi dengan modul '%s'", category.Name, product.ServiceType),
+		})
+		return
+	}
+
 	config.DB.Save(&product)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": product})
 }
@@ -309,7 +358,7 @@ func AdminDeleteDiscoveryTab(c *gin.Context) {
 // AdminGetStores - GET /api/v1/admin/stores
 func AdminGetStores(c *gin.Context) {
 	var stores []models.Store
-	config.DB.Preload("User").Order("created_at DESC").Find(&stores)
+	config.DB.Preload("User").Preload("BusinessModules").Order("created_at DESC").Find(&stores)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": stores})
 }
 
@@ -320,18 +369,27 @@ func AdminGetDrivers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": drivers})
 }
 
-// AdminUpdateStoreStatus - PATCH /api/v1/admin/stores/:id/status
-func AdminUpdateStoreStatus(c *gin.Context) {
+// AdminUpdateStore - PUT /api/v1/admin/stores/:id
+func AdminUpdateStore(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
-		Status string `json:"status"`
-		Level  string `json:"level"`
+		Status            string `json:"status"`
+		Level             string `json:"level"`
+		IsVerified        bool   `json:"is_verified"`
+		BusinessModuleIDs []uint `json:"business_module_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Format request tidak valid"})
 		return
 	}
 
+	var store models.Store
+	if err := config.DB.First(&store, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Toko tidak ditemukan"})
+		return
+	}
+
+	// Update metadata
 	updates := make(map[string]interface{})
 	if req.Status != "" {
 		updates["status"] = req.Status
@@ -339,23 +397,27 @@ func AdminUpdateStoreStatus(c *gin.Context) {
 	if req.Level != "" {
 		updates["level"] = req.Level
 	}
+	updates["is_verified"] = req.IsVerified
 
-	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Tidak ada data yang diupdate"})
+	if err := config.DB.Model(&store).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal update data toko"})
 		return
 	}
 
-	result := config.DB.Model(&models.Store{}).Where("id = ?", id).Updates(updates)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal update status"})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Toko tidak ditemukan"})
-		return
+	// Update Business Modules (Many-to-Many)
+	if req.BusinessModuleIDs != nil {
+		var modules []models.BusinessModule
+		if len(req.BusinessModuleIDs) > 0 {
+			config.DB.Find(&modules, req.BusinessModuleIDs)
+		}
+		// Use Replace to sync cleanly
+		if err := config.DB.Model(&store).Association("BusinessModules").Replace(modules); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Gagal update modul bisnis"})
+			return
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Status toko berhasil diperbarui"})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Data toko berhasil diperbarui"})
 }
 
 // AdminUpdateDriverStatus - PATCH /api/v1/admin/drivers/:id/status

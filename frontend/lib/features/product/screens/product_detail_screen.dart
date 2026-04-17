@@ -1,14 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
+import '../../../shared/models/review_model.dart';
 import '../../profile/controllers/favorites_controller.dart';
+import '../../store/controllers/store_controller.dart';
 import '../controllers/product_detail_controller.dart';
 import '../../../shared/widgets/reactive_cart_icon.dart';
-import 'package:get/get.dart';
+import '../../store/screens/store_detail_screen.dart';
+import '../../auth/widgets/auth_utils.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final ProductModel product;
@@ -22,25 +31,30 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final ApiService _api = ApiService();
-  
-  FavoritesController get _favController => Get.isRegistered<FavoritesController>() 
-      ? Get.find<FavoritesController>() 
-      : Get.put(FavoritesController());
-  
-  ProductDetailController get _controller => Get.put(
-      ProductDetailController(product: widget.product), 
-      tag: widget.product.id.toString()
-  );
-  
+  late final ProductDetailController _controller;
+  late final StoreController _storeController;
+  Map<String, dynamic> _metadata = {};
   bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
-  bool _isFollowing = false;
-  Map<String, dynamic> _metadata = {};
+
+  FavoritesController get _favController => Get.isRegistered<FavoritesController>() 
+      ? Get.find<FavoritesController>() 
+      : Get.put(FavoritesController());
 
   @override
   void initState() {
     super.initState();
+    // Initialize Product Controller
+    _controller = Get.put(
+      ProductDetailController(product: widget.product),
+      tag: 'product_${widget.product.id}'
+    );
+    // Initialize Store Controller (for follow logic)
+    _storeController = Get.put(
+      StoreController(storeId: widget.product.storeId), 
+      tag: 'store_${widget.product.storeId}'
+    );
     _parseMetadata();
   }
 
@@ -110,6 +124,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 _buildDetailsAndDescription(),
                 _buildDivider(),
                 _buildStoreInfo(),
+                _buildDivider(),
+                _buildReviewSection(),
                 _buildDivider(),
                 _buildRecommendationSection(),
                 const SizedBox(height: 40),
@@ -299,15 +315,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           )),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatItem('${widget.product.rating}', isRating: true),
-              _buildVerticalDivider(),
-              _buildStatItem('${widget.product.reviewCount} Penilaian'),
-              _buildVerticalDivider(),
-              _buildStatItem('Terjual ${_formatSold(widget.product.sold)}'),
-            ],
-          ),
+          Obx(() {
+            final p = _controller.productDetail.value ?? widget.product;
+            return Row(
+              children: [
+                _buildStatItem('${p.rating}', isRating: true, rating: p.rating),
+                _buildVerticalDivider(),
+                _buildStatItem(
+                  p.reviewCount > 0 
+                    ? '${p.reviewCount} Penilaian' 
+                    : 'Belum ada ulasan'
+                ),
+                _buildVerticalDivider(),
+                _buildStatItem('Terjual ${_formatSold(p.sold)}'),
+              ],
+            );
+          }),
           if (widget.product.variants.isNotEmpty) ...[
             const SizedBox(height: 24),
             Text(
@@ -326,19 +349,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildStatItem(String label, {bool isRating = false}) {
+  Widget _buildStatItem(String label, {bool isRating = false, double rating = 0.0}) {
     return Row(
       children: [
         if (isRating) ...[
-          const Icon(Icons.star_rounded, color: Colors.orange, size: 20),
-          const SizedBox(width: 4),
+          RatingBarIndicator(
+            rating: rating,
+            itemBuilder: (context, index) => const Icon(
+              Icons.star_rounded,
+              color: Colors.orange,
+            ),
+            itemCount: 5,
+            itemSize: 18.0,
+            direction: Axis.horizontal,
+          ),
+          const SizedBox(width: 6),
         ],
         Text(
           label,
           style: GoogleFonts.manrope(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: isRating ? AppColors.textPrimary : Colors.grey[600],
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -556,79 +588,99 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          store.name.toUpperCase(),
-                          style: GoogleFonts.manrope(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                child: GestureDetector(
+                  onTap: () => Get.to(() => StoreDetailScreen(storeId: store.id)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            store.name.toUpperCase(),
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        if (store.isVerified) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: Colors.blue, size: 16),
+                          if (store.isVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, color: Colors.blue, size: 16),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_outlined,
-                          color: Colors.grey,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          store.address.isNotEmpty
-                              ? store.address
-                              : 'Kota Taliwang',
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            color: Colors.grey,
+                            size: 14,
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 4),
+                          Text(
+                            store.address.isNotEmpty
+                                ? store.address
+                                : 'Kota Taliwang',
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              ElevatedButton(
+              Obx(() => ElevatedButton(
                 onPressed: () {
-                  setState(() => _isFollowing = !_isFollowing);
+                  HapticFeedback.mediumImpact();
+                  _storeController.toggleFollow();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isFollowing ? Colors.grey[100] : AppColors.primary,
-                  foregroundColor: _isFollowing ? Colors.grey[700] : Colors.white,
+                  backgroundColor: _storeController.isFollowing.value ? Colors.grey[100] : AppColors.primary,
+                  foregroundColor: _storeController.isFollowing.value ? Colors.grey[700] : Colors.white,
                   elevation: 0,
                   minimumSize: const Size(90, 36),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: _isFollowing ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                    side: _storeController.isFollowing.value ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
                   ),
                 ),
                 child: Text(
-                  _isFollowing ? 'Mengikuti' : 'Ikuti',
+                  _storeController.isFollowing.value ? 'Mengikuti' : 'Ikuti',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildStoreStat(Icons.star_rounded, '${store.rating}', '4.0'),
+              Obx(() {
+                final s = _storeController.storeDetail.value?.store ?? store;
+                return _buildStoreStat(
+                  Icons.star_rounded, 
+                  s.rating.toStringAsFixed(1), 
+                  '0.0'
+                );
+              }),
               _buildVerticalDivider(),
-              _buildStoreStat(
-                Icons.shopping_bag_outlined,
-                '${store.productCount} Produk',
-                '38 Produk',
-              ),
+              Obx(() => _buildStoreStat(
+                Icons.person_add_alt_1_outlined,
+                '${_storeController.storeDetail.value?.followerCount ?? 0} Pengikut',
+                '0 Pengikut',
+              )),
+              _buildVerticalDivider(),
+              Obx(() {
+                final s = _storeController.storeDetail.value?.store ?? store;
+                return _buildStoreStat(
+                  Icons.shopping_bag_outlined,
+                  '${s.productCount} Produk',
+                  '0 Produk',
+                );
+              }),
             ],
           ),
         ],
@@ -765,6 +817,303 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  Widget _buildReviewSection() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Penilaian Produk',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      RatingBarIndicator(
+                        rating: widget.product.rating,
+                        itemBuilder: (context, index) => const Icon(
+                          Icons.star_rounded,
+                          color: Colors.orange,
+                        ),
+                        itemCount: 5,
+                        itemSize: 18.0,
+                        direction: Axis.horizontal,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${widget.product.rating.toStringAsFixed(1)} / 5.0',
+                        style: GoogleFonts.manrope(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Obx(() {
+                if (_controller.canReview.value) {
+                  return TextButton.icon(
+                    onPressed: _showReviewDialog,
+                    icon: const Icon(Icons.rate_review_outlined, size: 18),
+                    label: const Text('Tulis Ulasan'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          Obx(() {
+            if (_controller.isLoadingReviews.value) {
+              return _buildReviewShimmer();
+            }
+            
+            if (_controller.reviews.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      Icon(Icons.reviews_outlined, color: Colors.grey[300], size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Belum ada ulasan untuk produk ini',
+                        style: GoogleFonts.manrope(color: Colors.grey[500], fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              children: _controller.reviews.map((r) => _buildReviewItem(r)).toList(),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewShimmer() {
+    return Column(
+      children: List.generate(2, (index) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey[200]!,
+          highlightColor: Colors.grey[50]!,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 40, height: 40, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(width: 100, height: 12, color: Colors.white),
+                    const SizedBox(height: 8),
+                    Container(width: double.infinity, height: 12, color: Colors.white),
+                    const SizedBox(height: 4),
+                    Container(width: 150, height: 12, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      )),
+    );
+  }
+
+  Widget _buildReviewItem(ReviewModel review) {
+    final user = review.user;
+    final avatarUrl = user?.avatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.grey[100],
+            backgroundImage: hasAvatar
+                ? NetworkImage(_api.getImageUrl(avatarUrl))
+                : null,
+            child: !hasAvatar
+                ? const Icon(Icons.person_rounded, size: 20, color: Colors.grey)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${user?.firstName ?? 'Warga'} ${user?.lastName ?? 'KSB'}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      DateFormat('dd MMM yyyy').format(review.createdAt),
+                      style: GoogleFonts.manrope(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                RatingBarIndicator(
+                  rating: review.rating.toDouble(),
+                  itemBuilder: (context, index) => const Icon(
+                    Icons.star_rounded,
+                    color: Colors.orange,
+                  ),
+                  itemCount: 5,
+                  itemSize: 14.0,
+                  direction: Axis.horizontal,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  review.comment,
+                  style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    color: Colors.grey[700],
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReviewDialog() {
+    int currentRating = 5;
+    final commentController = TextEditingController();
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bagaimana produk ini menurut Anda?',
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: RatingBar.builder(
+                initialRating: 5,
+                minRating: 1,
+                direction: Axis.horizontal,
+                allowHalfRating: false,
+                itemCount: 5,
+                itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+                itemBuilder: (context, _) => const Icon(
+                  Icons.star_rounded,
+                  color: Colors.orange,
+                ),
+                onRatingUpdate: (val) {
+                  HapticFeedback.lightImpact();
+                  currentRating = val.toInt();
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: commentController,
+              maxLines: 4,
+              textInputAction: TextInputAction.done,
+              style: GoogleFonts.manrope(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Tuliskan ulasan jujur Anda di sini (kualitas produk, packing, dll)...',
+                hintStyle: GoogleFonts.manrope(color: Colors.grey[400], fontSize: 13),
+                filled: true,
+                fillColor: Colors.grey[50],
+                contentPadding: const EdgeInsets.all(16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (commentController.text.trim().isEmpty) {
+                    AppAlert.info('Komentar Kosong', 'Berikan sedikit komentar untuk warga KSB lainnya.');
+                    return;
+                  }
+                  HapticFeedback.mediumImpact();
+                  Get.back(); // Close bottom sheet
+                  await _controller.submitReview(currentRating, commentController.text.trim());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'Kirim Ulasan',
+                  style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
   String _formatSold(int sold) {
     if (sold >= 1000) {
       return '${(sold / 1000).toStringAsFixed(1)}k';
@@ -773,23 +1122,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _handleChat() async {
+    if (!AuthUtils.isLoggedIn) {
+      AppAlert.info('Login Diperlukan', 'Silakan login untuk memulai percakapan dengan penjual');
+      return;
+    }
+
     final store = widget.product.store;
     if (store == null) return;
-    
-    // Fallback phone if not provided in user object
-    String phone = "6282340331000"; // Sample official LocalMart support
-    
-    final message = "Halo ${store.name}, saya tertarik dengan *${widget.product.name}* di LocalMart. Apakah masih tersedia?";
-    final url = "https://wa.me/$phone?text=${Uri.encodeComponent(message)}";
-    
-    if (await canLaunchUrlString(url)) {
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal membuka WhatsApp')),
+
+    // Show loading indicator
+    Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
+
+    try {
+      final convData = await _api.startConversation(store.userId);
+      Get.back(); // Close loading
+
+      if (convData.isNotEmpty) {
+        Get.toNamed(
+          '/chat-room',
+          arguments: store,
         );
+      } else {
+        AppAlert.error('Gagal', 'Tidak dapat memulai percakapan');
       }
+    } catch (e) {
+      Get.back(); // Close loading
+      AppAlert.error('Error', 'Terjadi kesalahan saat memulai chat');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/services/admin_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -41,9 +42,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _updateStore(int id, String? status, String? level) async {
     final result = await AdminService().updateStoreStatus(id, status: status, level: level);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red),
-      );
+      if (result['success']) {
+        AppAlert.success('Update Berhasil', result['message'] ?? 'Status berhasil diperbarui');
+      } else {
+        AppAlert.error('Update Gagal', result['message'] ?? 'Terjadi kesalahan');
+      }
       _loadDashboardData();
     }
   }
@@ -243,7 +246,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   final res = await AdminService().updateDriverStatus(driver['id'], 'approved');
                   if (mounted) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'])));
+                      AppAlert.success('Update Driver', res['message'] ?? 'Driver telah disetujui');
                     }
                     _loadDashboardData();
                   }

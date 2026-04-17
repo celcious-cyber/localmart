@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/utils/app_alert.dart';
 import '../../../core/theme/app_colors.dart';
 
 class LocationPickerScreen extends StatefulWidget {
@@ -48,9 +49,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengambil lokasi: $e')),
-        );
+        AppAlert.error('Lokasi Gagal', 'Gagal mengambil lokasi: $e');
       }
     } finally {
       if (mounted) {

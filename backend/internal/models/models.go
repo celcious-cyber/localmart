@@ -19,16 +19,17 @@ type Banner struct {
 
 // Category - tab kategori di homepage (Food & Drink, Fashion, dll.)
 type Category struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"size:100;not null" json:"name"`
-	Slug      string    `gorm:"size:100;uniqueIndex;not null" json:"slug"`
-	IconName  string    `gorm:"size:100" json:"icon_name"` // nama icon Material Design
-	SortOrder int       `gorm:"default:0" json:"sort_order"`
-	Type      string    `gorm:"size:20;not null;default:'BARANG'" json:"type"` // BARANG, JASA, RENTAL, WISATA
-	IsActive  bool      `gorm:"default:true" json:"is_active"`
-	Products  []Product `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"size:100;not null" json:"name"`
+	Slug        string    `gorm:"size:100;uniqueIndex;not null" json:"slug"`
+	IconName    string    `gorm:"size:100" json:"icon_name"`                       // nama icon Material Design
+	SortOrder   int       `gorm:"default:0" json:"sort_order"`
+	Type        string    `gorm:"size:20;not null;default:'BARANG'" json:"type"`   // BARANG, JASA, RENTAL, WISATA
+	ServiceType string    `gorm:"size:20;not null;default:'mart'" json:"service_type"` // food, mart, send
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	Products    []Product `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ProductImage - banyak foto untuk satu produk
@@ -52,6 +53,7 @@ type Product struct {
 	Sold        int       `gorm:"default:0" json:"sold"`
 	Rating      float64   `gorm:"default:0" json:"rating"`
 	ReviewCount int       `gorm:"default:0" json:"review_count"`
+	StoreCategories []StoreCategory `gorm:"many2many:product_store_categories;" json:"store_categories,omitempty"` // multi-etalase toko
 	
 	// Dimensi & Berat & Logistics
 	Weight      float64   `gorm:"default:0" json:"weight"` // dalam gram
@@ -67,9 +69,13 @@ type Product struct {
 	
 	// Modular Features (V2)
 	ProductType string    `gorm:"size:20;not null;default:'BARANG'" json:"product_type"` // BARANG, JASA, RENTAL, WISATA
+	ServiceType string    `gorm:"size:20;not null;default:'mart'" json:"service_type"` // food, mart, send, kost, rental, transport, jasa, umkm, bumi, wisata, second
 	Metadata    string    `gorm:"type:text" json:"metadata"`                           // JSON Stringified data
 	
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	IsFresh     bool      `gorm:"default:false" json:"is_fresh"`
+	IsFeatured  bool      `gorm:"default:false" json:"is_featured"`
+	IsLocalGem  bool      `gorm:"default:false" json:"is_local_gem"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
@@ -138,6 +144,14 @@ type User struct {
 	Driver *Driver `gorm:"foreignKey:UserID" json:"driver,omitempty"`
 }
 
+// BusinessModule - modul utama penemuan (food, mart, kost, dll)
+type BusinessModule struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Code      string    `gorm:"size:50;uniqueIndex;not null" json:"code"` // food, mart, kost, etc
+	Name      string    `gorm:"size:100;not null" json:"name"`            // Kuliner KSB, Info Kost, dll
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Store - profil toko UMKM milik user
 type Store struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
@@ -158,12 +172,14 @@ type Store struct {
 	Rating       float64   `gorm:"default:0" json:"rating"`
 	ReviewCount  int       `gorm:"default:0" json:"review_count"`
 	ProductCount int       `gorm:"default:0" json:"product_count"`
+	BannerURL    string    `gorm:"size:500" json:"banner_url"`
 	IsActive     bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 
 	// Associations
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	BusinessModules []BusinessModule `gorm:"many2many:store_business_modules;" json:"business_modules,omitempty"`
 }
 
 // Driver - profil mitra driver (kurir/ojek) milik user
@@ -303,4 +319,59 @@ type CartItem struct {
 	// Associations
 	Product *Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 	Variant *ProductVariant `gorm:"foreignKey:VariantID" json:"variant,omitempty"`
+}
+
+// StoreCategory - kategori etalase khusus milik toko (Etalase)
+type StoreCategory struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	StoreID   uint      `gorm:"not null;index" json:"store_id"`
+	Name      string    `gorm:"size:100;not null" json:"name"`
+	SortOrder int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// Associations
+	Store    *Store    `gorm:"foreignKey:StoreID" json:"-"`
+	Products []Product `gorm:"many2many:product_store_categories;" json:"products,omitempty"`
+}
+
+// Conversation - grouping messages between two entities
+type Conversation struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Participant1ID uint      `gorm:"not null;index" json:"participant1_id"` // User ID 1
+	Participant2ID uint      `gorm:"not null;index" json:"participant2_id"` // User ID 2
+	LastMessage   string    `gorm:"type:text" json:"last_message"`
+	UpdatedAt     time.Time `json:"updated_at"`
+
+	// Associations
+	Participant1 User `gorm:"foreignKey:Participant1ID" json:"participant1,omitempty"`
+	Participant2 User `gorm:"foreignKey:Participant2ID" json:"participant2,omitempty"`
+}
+
+// Message - individual chat message
+type Message struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	ConversationID uint      `gorm:"not null;index" json:"conversation_id"`
+	SenderID       uint      `gorm:"not null;index" json:"sender_id"`
+	ReceiverID     uint      `gorm:"not null;index" json:"receiver_id"`
+	SenderType     string    `gorm:"size:20;default:'user'" json:"sender_type"` // "user" or "merchant"
+	Content        string    `gorm:"type:text;not null" json:"content"`
+	IsRead         bool      `gorm:"default:false" json:"is_read"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	// Associations
+	Conversation Conversation `gorm:"foreignKey:ConversationID" json:"-"`
+	Sender       User         `gorm:"foreignKey:SenderID" json:"sender,omitempty"`
+}
+
+// HelpCenter - educational and FAQ content
+type HelpCenter struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Title     string    `gorm:"size:255;not null" json:"title"`
+	Content   string    `gorm:"type:text;not null" json:"content"`
+	Category  string    `gorm:"size:100" json:"category"` // "Umum", "Penjual", "Pembeli", "Keamanan"
+	Icon      string    `gorm:"size:100" json:"icon"`     // Material icon name
+	SortOrder int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

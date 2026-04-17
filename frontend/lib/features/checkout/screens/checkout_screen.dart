@@ -97,11 +97,6 @@ class CheckoutScreen extends StatelessWidget {
   
               const SizedBox(height: 16),
   
-              // 🪙 SECTION: LOYALTY (LOCALPOINT)
-              Obx(() => _buildLoyaltyCard(controller, api)),
-  
-              const SizedBox(height: 16),
-  
               // 💳 SECTION: METODE PEMBAYARAN
               Obx(() => _buildPaymentPicker(controller, api)),
   
@@ -289,6 +284,8 @@ class CheckoutScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            _buildLoyaltyCard(controller, api),
+            const Divider(height: 24),
             _buildPriceRow('Subtotal Pesanan', controller.subtotal.value, api, isLoading: controller.isCalculating.value),
             if (controller.isPhysical) ...[
               const SizedBox(height: 12),
@@ -431,41 +428,31 @@ class CheckoutScreen extends StatelessWidget {
   }
 
   Widget _buildLoyaltyCard(CheckoutController controller, ApiService api) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            const Icon(Icons.stars_rounded, color: AppColors.primary, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Gunakan LocalPoint',
-                    style: GoogleFonts.manrope(fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                  Text(
-                    'Tukarkan ${api.formatCurrency(controller.userPoints.value)} untuk diskon',
-                    style: GoogleFonts.manrope(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                ],
+    return Row(
+      children: [
+        const Icon(Icons.stars_rounded, color: AppColors.primary, size: 24),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Gunakan LocalPoint',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.w800, fontSize: 14),
               ),
-            ),
-            Obx(() => Switch(
-              value: controller.usePoints.value,
-              onChanged: (val) => controller.usePoints.value = val,
-              activeThumbColor: AppColors.primary,
-            )),
-          ],
+              Text(
+                'Tukarkan ${api.formatCurrency(controller.userPoints.value)} untuk diskon',
+                style: GoogleFonts.manrope(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
+          ),
         ),
-      ),
+        Obx(() => Switch(
+          value: controller.usePoints.value,
+          onChanged: (val) => controller.usePoints.value = val,
+          activeThumbColor: AppColors.primary,
+        )),
+      ],
     );
   }
 
@@ -490,6 +477,14 @@ class CheckoutScreen extends StatelessWidget {
             },
             child: Column(
               children: [
+                RadioListTile<String>(
+                  title: Text('LocalPay', style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: Text('Bayar menggunakan Saldo LocalPay', style: GoogleFonts.manrope(fontSize: 12)),
+                  secondary: const Icon(Icons.account_balance_wallet_rounded, color: Colors.orange),
+                  value: 'LOCALPAY',
+                  activeColor: AppColors.primary,
+                ),
+                const Divider(height: 1),
                 RadioListTile<String>(
                   title: Text('Transfer Bank', style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 14)),
                   subtitle: Text('Manual Verifikasi', style: GoogleFonts.manrope(fontSize: 12)),

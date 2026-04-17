@@ -48,13 +48,21 @@ func GenerateToken(id uint, email string, role string) (string, error) {
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		tokenString := ""
+
+		if authHeader != "" {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			// Fallback: cek query parameter "token" (untuk WebSocket)
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Token tidak ditemukan"})
 			c.Abort()
 			return
 		}
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			return jwtSecret, nil

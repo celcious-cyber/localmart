@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_patterns.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 import '../search/screens/search_screen.dart';
@@ -24,6 +26,8 @@ import '../umkm/umkm_screen.dart';
 import '../agri/agri_screen.dart';
 import '../product/screens/product_detail_screen.dart';
 import '../profile/controllers/favorites_controller.dart';
+import './controllers/home_data_controller.dart';
+import './widgets/module_discovery_section.dart';
 import '../../shared/widgets/reactive_cart_icon.dart';
 import 'package:get/get.dart';
 
@@ -42,12 +46,16 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _controller;
   late Animation<double> _animation;
   final PageController _bannerController = PageController();
+  final ScrollController _categoryScrollController = ScrollController();
 
   // API State
   final ApiService _api = ApiService();
   final FavoritesController _favController = Get.put(FavoritesController());
-  HomeResponseModel? _homeData;
-  bool _isLoading = true;
+  
+  // Note: Local discovery states kept for legacy 'discovery' section if needed,
+  // but most logic moved to HomeDataController.
+  List<ProductModel> _discoveryProducts = [];
+  bool _isDiscoveryLoading = false;
 
   @override
   void initState() {
@@ -61,16 +69,39 @@ class _HomeScreenState extends State<HomeScreen>
       end: 0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     
-    _fetchHomeData();
+    // Auto-fetch first discovery tab for legacy section
+    _homeController.homeData.listen((data) {
+      if (data != null && data.discoveryTabs.isNotEmpty && _discoveryProducts.isEmpty) {
+        _fetchDiscoveryProducts(0);
+      }
+    });
   }
 
-  Future<void> _fetchHomeData() async {
-    setState(() => _isLoading = true);
-    final data = await _api.getHomeData();
+  Future<void> _fetchDiscoveryProducts(int index) async {
+    final homeData = _homeController.homeData.value;
+    if (homeData == null || homeData.discoveryTabs.isEmpty) return;
+    
+    setState(() {
+      _activeDiscoveryTab = index;
+      _isDiscoveryLoading = true;
+    });
+
+    final tabName = homeData.discoveryTabs[index].name;
+    String tag = 'panen_hari_ini';
+    if (tabName.toLowerCase().contains('umkm')) {
+      tag = 'umkm_pilihan';
+    } else if (tabName.toLowerCase().contains('ksb')) {
+      tag = 'eksplore_ksb';
+    } else if (tabName.toLowerCase().contains('local')) {
+      tag = 'local_mart';
+    }
+
+    final products = await _api.getDiscoveryProducts(tag);
+    
     if (mounted) {
       setState(() {
-        _homeData = data;
-        _isLoading = false;
+        _discoveryProducts = products;
+        _isDiscoveryLoading = false;
       });
     }
   }
@@ -79,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _controller.dispose();
     _bannerController.dispose();
+    _categoryScrollController.dispose();
     super.dispose();
   }
 
@@ -117,43 +149,50 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  final HomeDataController _homeController = Get.put(HomeDataController());
+
   // ════════════════════════════════════════════════════════════════
   // HOME BODY
   // ════════════════════════════════════════════════════════════════
   Widget _buildHomeBody(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-    }
+    return Obx(() {
+      if (_homeController.isLoading.value) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
 
-    return RefreshIndicator(
-      onRefresh: _fetchHomeData,
-      color: AppColors.primary,
-      child: CustomScrollView(
-        clipBehavior: Clip.none,
-        slivers: [
-          // Pinned Header with Search Bar
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _SearchHeaderDelegate(),
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: _buildDynamicSections(),
+      return RefreshIndicator(
+        onRefresh: () => _homeController.fetchHomeData(),
+        color: AppColors.primary,
+        child: CustomScrollView(
+          clipBehavior: Clip.none,
+          slivers: [
+            // Pinned Header with Search Bar
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SearchHeaderDelegate(),
             ),
-          ),
-        ],
-      ),
-    );
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _buildDynamicSections(),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   List<Widget> _buildDynamicSections() {
-    if (_homeData == null) return [const Center(child: Text("Gagal memuat data"))];
+    final homeData = _homeController.homeData.value;
+    if (homeData == null) return [const Center(child: Text("Gagal memuat data"))];
 
     List<Widget> sections = [const SizedBox(height: 12)];
 
-    // Urutkan dan filter section berdasarkan database CMS
-    for (var section in _homeData!.sections) {
+    // Map module keys to ModuleDiscovery widgets
+    final moduleMap = {for (var m in homeData.modules) m.slug: m};
+
+    for (var section in homeData.sections) {
       if (!section.isActive) continue;
 
       switch (section.key) {
@@ -178,13 +217,28 @@ class _HomeScreenState extends State<HomeScreen>
           sections.add(const SizedBox(height: 10));
           break;
         case 'discovery':
+          sections.add(_buildDiscoveryHeader());
+          sections.add(const SizedBox(height: 12));
           sections.add(_buildDiscoveryPills());
-          sections.add(const SizedBox(height: 10));
+          sections.add(const SizedBox(height: 16));
           sections.add(_buildDiscoveryProductGrid());
-          sections.add(const SizedBox(height: 120));
+          sections.add(const SizedBox(height: 12));
+          break;
+        default:
+          // Handle dynamic modular discovery sections (module_*)
+          if (section.key.startsWith('module_')) {
+            final moduleSlug = section.key.replaceFirst('module_', '');
+            if (moduleMap.containsKey(moduleSlug)) {
+              sections.add(ModuleDiscoverySection(module: moduleMap[moduleSlug]!));
+              sections.add(const SizedBox(height: 20));
+            }
+          }
           break;
       }
     }
+
+    // Spacing for bottom nav
+    sections.add(const SizedBox(height: 120));
 
     return sections;
   }
@@ -208,16 +262,32 @@ class _HomeScreenState extends State<HomeScreen>
       {'icon': Icons.swap_horiz_rounded, 'label': 'Second', 'screen': 'Second'},
     ];
 
+    if (actions.isEmpty) {
+      return Container(
+        height: 80,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: Text("Layanan tidak tersedia")),
+      );
+    }
+
     return SizedBox(
       height: 80,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: actions.length,
         itemBuilder: (context, index) {
           final action = actions[index];
           return GestureDetector(
-            onTap: () => _navigateToService(action['screen'] as String),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _navigateToService(action['screen'] as String);
+            },
             child: Container(
               width: 68,
               margin: const EdgeInsets.only(right: 4),
@@ -262,7 +332,7 @@ class _HomeScreenState extends State<HomeScreen>
   // BANNER HIGHLIGHT
   // ════════════════════════════════════════════════════════════════
   Widget _buildBannerHighlight() {
-    final banners = _homeData?.banners ?? [];
+    final banners = _homeController.homeData.value?.banners ?? [];
     if (banners.isEmpty) return const SizedBox.shrink();
 
     // Untuk demo kita ambil banner pertama saja
@@ -324,40 +394,59 @@ class _HomeScreenState extends State<HomeScreen>
   // CATEGORY TABS
   // ════════════════════════════════════════════════════════════════
   Widget _buildCategoryTabs() {
-    final categories = _homeData?.categories ?? [];
+    final categories = _homeController.homeData.value?.categories ?? [];
     if (categories.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 36,
+      height: 46,
       child: ListView.builder(
+        controller: _categoryScrollController,
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: categories.length,
         itemBuilder: (context, index) {
           final isSelected = _activeCategoryTab == index;
           return GestureDetector(
             onTap: () {
+              HapticFeedback.lightImpact();
               setState(() => _activeCategoryTab = index);
+              
+              // Scroll-to-center logic
+              _categoryScrollController.animateTo(
+                index * 100.0 - (MediaQuery.of(context).size.width / 2) + 50.0,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeOutCubic,
+              ).catchError((_) {}); // Ignore if scroll is already at end
             },
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
               margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primary
                       : AppColors.outlineVariant,
                   width: 1,
                 ),
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ] : null,
               ),
               child: Text(
                 categories[index].name,
                 style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected ? Colors.white : AppColors.textSecondary,
                 ),
               ),
@@ -372,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen>
   // PRODUCT GRID (Category Section)
   // ════════════════════════════════════════════════════════════════
   Widget _buildProductGrid() {
-    final categories = _homeData?.categories ?? [];
+    final categories = _homeController.homeData.value?.categories ?? [];
     if (categories.isEmpty || _activeCategoryTab >= categories.length) {
       return const SizedBox.shrink();
     }
@@ -394,7 +483,7 @@ class _HomeScreenState extends State<HomeScreen>
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.62,
+          childAspectRatio: 0.68,
         ),
         itemCount: products.length,
         itemBuilder: (context, index) {
@@ -408,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
   
-  Widget _buildProductCard(ProductModel product, String heroTag) {
+  Widget _buildProductCard(ProductModel product, String heroTag, {double? width}) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -422,6 +511,7 @@ class _HomeScreenState extends State<HomeScreen>
         );
       },
       child: Container(
+        width: width,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -504,7 +594,7 @@ class _HomeScreenState extends State<HomeScreen>
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
@@ -528,23 +618,43 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     const Spacer(),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.visibility_outlined,
-                          size: 13,
-                          color: AppColors.success,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Lihat Detail...',
-                          style: GoogleFonts.manrope(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.success,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: Colors.orange,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            '${product.rating}',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '|',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              color: Colors.grey[300],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Terjual ${product.sold}',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -557,10 +667,49 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ════════════════════════════════════════════════════════════════
+  // DISCOVERY HEADER
+  // ════════════════════════════════════════════════════════════════
+  Widget _buildDiscoveryHeader() {
+    final activeTabName = _homeController.homeData.value != null && _homeController.homeData.value!.discoveryTabs.isNotEmpty
+        ? _homeController.homeData.value!.discoveryTabs[_activeDiscoveryTab].name
+        : 'Discovery';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            activeTabName,
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              // Navigate to discovery detail screen
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              textStyle: GoogleFonts.manrope(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: const Text('Lihat Semua'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
   // BANNER SLIDER
   // ════════════════════════════════════════════════════════════════
   Widget _buildBannerSlider() {
-    final sliders = _homeData?.bannerSliders ?? [];
+    final sliders = _homeController.homeData.value?.bannerSliders ?? [];
     if (sliders.isEmpty) return const SizedBox.shrink();
 
     // Gunakan banner pertama slider untuk demo
@@ -620,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen>
   // DISCOVERY PILLS
   // ════════════════════════════════════════════════════════════════
   Widget _buildDiscoveryPills() {
-    final tabs = _homeData?.discoveryTabs ?? [];
+    final tabs = _homeController.homeData.value?.discoveryTabs ?? [];
     if (tabs.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
@@ -633,14 +782,18 @@ class _HomeScreenState extends State<HomeScreen>
           final isSelected = _activeDiscoveryTab == index;
           return GestureDetector(
             onTap: () {
-              setState(() => _activeDiscoveryTab = index);
+              if (_activeDiscoveryTab != index) {
+                _fetchDiscoveryProducts(index);
+              }
             },
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
+                color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
@@ -668,34 +821,78 @@ class _HomeScreenState extends State<HomeScreen>
   // DISCOVERY PRODUCT GRID
   // ════════════════════════════════════════════════════════════════
   Widget _buildDiscoveryProductGrid() {
-    // Discovery grid data - bisa dikembangkan lagi sesuai kebutuhan CMS
-    // Untuk saat ini kita ambil beberapa produk acak dari semua kategori
-    List<ProductModel> products = [];
-    if (_homeData != null) {
-      for (var cat in _homeData!.categories) {
-        products.addAll(cat.products);
-      }
+    if (_isDiscoveryLoading) {
+      return _buildDiscoveryShimmer();
     }
-    
-    if (products.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.62,
+    final products = _discoveryProducts;
+    
+    if (products.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text(
+                'Belum ada produk di kategori ini',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  color: Colors.grey[400],
+                ),
+              ),
+            ],
+          ),
         ),
-        itemCount: products.length > 4 ? 4 : products.length,
+      );
+    }
+
+    return SizedBox(
+      height: 280,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(left: 16, right: 4, bottom: 20),
+        itemCount: products.length,
         itemBuilder: (context, index) {
           final product = products[index];
-          return _buildProductCard(
-            product, 
-            'home_disc_${product.id}',
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _buildProductCard(
+              product, 
+              'home_disc_${product.id}',
+              width: 170,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDiscoveryShimmer() {
+    return SizedBox(
+      height: 280,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 3,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[200]!,
+              highlightColor: Colors.white,
+              child: Container(
+                width: 170,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
           );
         },
       ),

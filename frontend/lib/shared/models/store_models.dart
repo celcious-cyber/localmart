@@ -33,6 +33,32 @@ class StoreDashboardModel {
   }
 }
 
+class StoreDetailWrapper {
+  final StoreModel store;
+  final int followerCount;
+  final int transactionCount;
+  final List<StoreCategoryModel> categories;
+
+  StoreDetailWrapper({
+    required this.store,
+    required this.followerCount,
+    required this.transactionCount,
+    required this.categories,
+  });
+
+  factory StoreDetailWrapper.fromJson(Map<String, dynamic> json) {
+    return StoreDetailWrapper(
+      store: StoreModel.fromJson(json['store'] ?? {}),
+      followerCount: json['follower_count'] ?? 0,
+      transactionCount: json['transaction_count'] ?? 0,
+      categories: (json['categories'] as List?)
+              ?.map((c) => StoreCategoryModel.fromJson(c))
+              .toList() ??
+          [],
+    );
+  }
+}
+
 class StoreModel {
   final int id;
   final int userId;
@@ -41,6 +67,7 @@ class StoreModel {
   final String description;
   final String address;
   final String imageUrl;
+  final String bannerUrl;
   final double balance;
   final String status;
   final String level;
@@ -53,6 +80,7 @@ class StoreModel {
   final int reviewCount;
   final int productCount;
   final bool isActive;
+  final List<String> businessModules;
 
   StoreModel({
     required this.id,
@@ -62,6 +90,7 @@ class StoreModel {
     required this.description,
     required this.address,
     required this.imageUrl,
+    this.bannerUrl = '',
     required this.balance,
     required this.status,
     required this.level,
@@ -74,6 +103,7 @@ class StoreModel {
     this.reviewCount = 0,
     this.productCount = 0,
     required this.isActive,
+    this.businessModules = const [],
   });
 
   factory StoreModel.fromJson(Map<String, dynamic> json) {
@@ -85,6 +115,7 @@ class StoreModel {
       description: json['description'] ?? '',
       address: json['address'] ?? '',
       imageUrl: json['image_url'] ?? '',
+      bannerUrl: json['banner_url'] ?? '',
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? 'pending',
       level: json['level'] ?? 'regular',
@@ -97,6 +128,10 @@ class StoreModel {
       reviewCount: json['review_count'] ?? 0,
       productCount: json['product_count'] ?? 0,
       isActive: json['is_active'] ?? true,
+      businessModules: (json['business_modules'] as List?)
+              ?.map((m) => m['code'] as String)
+              .toList() ??
+          [],
     );
   }
 }
@@ -170,5 +205,37 @@ class OrderItemModel {
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
     );
+  }
+}
+
+class StoreCategoryModel {
+  final int id;
+  final int storeId;
+  final String name;
+  final int sortOrder;
+
+  StoreCategoryModel({
+    required this.id,
+    required this.storeId,
+    required this.name,
+    required this.sortOrder,
+  });
+
+  factory StoreCategoryModel.fromJson(Map<String, dynamic> json) {
+    return StoreCategoryModel(
+      id: json['id'] ?? 0,
+      storeId: json['store_id'] ?? 0,
+      name: json['name'] ?? '',
+      sortOrder: json['sort_order'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'store_id': storeId,
+      'name': name,
+      'sort_order': sortOrder,
+    };
   }
 }
