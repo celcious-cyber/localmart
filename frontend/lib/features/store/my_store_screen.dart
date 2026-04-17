@@ -4,7 +4,7 @@ import '../../core/utils/app_alert.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../shared/models/store_models.dart';
-import '../admin/screens/location_picker_screen.dart';
+import '../../shared/screens/location_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
