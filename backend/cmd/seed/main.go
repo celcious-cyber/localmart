@@ -62,6 +62,7 @@ func main() {
 
 	// 0. Pastikan tabel ada (Migrasi)
 	db.AutoMigrate(
+		&models.Admin{},
 		&models.Category{},
 		&models.Store{},
 		&models.Product{},
@@ -76,6 +77,7 @@ func main() {
 	)
 
 	// 1. Bersihkan data lama (Urutan penting untuk Foregin Key)
+	db.Exec("DELETE FROM admins")
 	db.Exec("DELETE FROM help_centers")
 	db.Exec("DELETE FROM messages")
 	db.Exec("DELETE FROM conversations")
@@ -168,6 +170,14 @@ func main() {
 	for _, m := range busModules {
 		moduleMap[m.Code] = m
 	}
+
+	// 2.6 Seed Admin (NEW)
+	log.Println("[Seeder] Seeding Admin Account...")
+	adminPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	db.Create(&models.Admin{
+		Username: "admin",
+		Password: string(adminPassword),
+	})
 
 	// 3. Seed Users (Demo User & Stores Owner)
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)

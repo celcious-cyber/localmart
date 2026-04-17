@@ -3,9 +3,6 @@ package main
 import (
 	"log"
 	"os"
-
-	"net/http"
-	"strings"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/ksb/localmart/backend/internal/config"
@@ -24,11 +21,22 @@ func main() {
 	// Inisialisasi router Gin
 	r := gin.Default()
 
-	// CORS middleware — izinkan Flutter app mengakses API
+	// CORS middleware — Mendukung pemisahan Admin Panel dan testing via LAN/IP
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		// Dapatkan origin dari request
+		origin := c.Request.Header.Get("Origin")
+		
+		// Set header CORS
+		// Catatan: Menggunakan "*" adalah yang paling fleksibel untuk development & LAN testing.
+		// Untuk produksi, ganti "*" dengan origin spesifik (misal: "http://admin.localmart.com")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin) 
+		if origin == "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+		
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -38,33 +46,8 @@ func main() {
 		c.Next()
 	})
 
-	// Serve static uploads folder
+	// Serve static uploads folder (Tetap dipertahankan untuk gambar produk)
 	r.Static("/uploads", "./uploads")
-
-	// Serve admin web panel (SPA Support)
-	r.Static("/admin/css", "./web/admin/css")
-	r.Static("/admin/js", "./web/admin/js")
-
-	// Admin Web Entry Points
-	adminGroup := r.Group("/admin")
-	{
-		adminGroup.GET("/", func(c *gin.Context) { c.File("./web/admin/index.html") })
-		adminGroup.GET("/index.html", func(c *gin.Context) { c.File("./web/admin/index.html") })
-		adminGroup.GET("/dashboard.html", func(c *gin.Context) { c.File("./web/admin/dashboard.html") })
-	}
-
-	// SPA Fallback for Admin Panel Sub-paths
-	r.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		log.Printf("[DEBUG] NoRoute hit: %s", path)
-
-		if strings.HasPrefix(path, "/admin") {
-			// All other sub-paths (like /admin/vouchers) serve dashboard.html
-			c.File("./web/admin/dashboard.html")
-			return
-		}
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Rute tidak ditemukan"})
-	})
 
 	// Mendaftarkan semua rute API
 	routes.SetupRoutes(r)

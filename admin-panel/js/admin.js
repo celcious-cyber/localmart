@@ -1,4 +1,5 @@
-const API_URL = '/api/v1';
+// URL absolut ke backend (bisa diganti via .env atau config nantinya)
+const API_URL = 'http://localhost:8080/api/v1';
 
 // --- Utility Functions ---
 const getHeaders = () => ({
@@ -9,7 +10,7 @@ const getHeaders = () => ({
 const handleResponse = async (response) => {
     if (response.status === 401) {
         localStorage.removeItem('admin_token');
-        window.location.href = '/admin/index.html';
+        window.location.href = 'index.html';
         return;
     }
     const data = await response.json();
@@ -49,7 +50,7 @@ if (loginForm) {
             if (data.success) {
                 localStorage.setItem('admin_token', data.data.token);
                 localStorage.setItem('admin_user', data.data.username);
-                window.location.href = '/admin/dashboard.html';
+                window.location.href = 'dashboard.html';
             } else {
                 errorMsg.innerText = data.message;
                 errorMsg.style.display = 'block';
@@ -66,8 +67,8 @@ if (loginForm) {
 
 // --- Dashboard & Sections ---
 const currentPath = window.location.pathname;
-const isLoginPage = currentPath === '/admin' || currentPath === '/admin/' || currentPath.includes('index.html');
-const isAdminPath = currentPath.startsWith('/admin');
+const isLoginPage = currentPath === '/' || currentPath.includes('index.html');
+const isAdminPath = true; // Always true in this standalone folder
 
 if (isAdminPath && !isLoginPage) {
     const adminUser = localStorage.getItem('admin_user');
@@ -78,7 +79,7 @@ if (isAdminPath && !isLoginPage) {
     // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
         localStorage.removeItem('admin_token');
-        window.location.href = '/admin/index.html';
+        window.location.href = 'index.html';
     });
 
     // Navigation Logic

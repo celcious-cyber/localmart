@@ -6,7 +6,7 @@
     <title>LocalMart | Admin Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="/admin/css/admin.css?v=2.0.1">
+    <link rel="stylesheet" href="css/admin.css?v=2.0.1">
 </head>
 <body class="dashboard-page">
     <!-- Sidebar -->
@@ -16,42 +16,42 @@
         </div>
         <ul class="nav-links">
             <li class="nav-item">
-                <a href="/admin/overview" class="nav-link active" data-target="overview">
+                <a href="#overview" class="nav-link active" data-target="overview">
                     <i class="material-icons">dashboard</i> Overview
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/banners" class="nav-link" data-target="banners">
+                <a href="#banners" class="nav-link" data-target="banners">
                     <i class="material-icons">view_carousel</i> Banners
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/categories" class="nav-link" data-target="categories">
+                <a href="#categories" class="nav-link" data-target="categories">
                     <i class="material-icons">category</i> Categories
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/products" class="nav-link" data-target="products">
+                <a href="#products" class="nav-link" data-target="products">
                     <i class="material-icons">shopping_bag</i> Products
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/stores" class="nav-link" data-target="stores">
+                <a href="#stores" class="nav-link" data-target="stores">
                     <i class="material-icons">store</i> Stores
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/drivers" class="nav-link" data-target="drivers">
+                <a href="#drivers" class="nav-link" data-target="drivers">
                     <i class="material-icons">local_shipping</i> Drivers
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/sections" class="nav-link" data-target="sections">
+                <a href="#sections" class="nav-link" data-target="sections">
                     <i class="material-icons">settings_overscan</i> UI Sections
                 </a>
             </li>
             <li class="nav-item">
-                <a href="/admin/vouchers" class="nav-link" data-target="vouchers">
+                <a href="#vouchers" class="nav-link" data-target="vouchers">
                     <i class="material-icons">confirmation_number</i> Vouchers
                 </a>
             </li>
@@ -516,11 +516,11 @@
         </div>
     </div>
 
-    <script src="/admin/js/admin.js?v=2.0.2"></script>
+    <script src="js/admin.js?v=2.0.2"></script>
     <script>
         // Check Auth
         if (!localStorage.getItem('admin_token')) {
-            window.location.href = '/admin/index.html';
+            window.location.href = 'index.html';
         }
 
         // Auth Check is handled in dashboard.html shell or can be added to initDashboard
