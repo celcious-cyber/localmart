@@ -495,6 +495,20 @@ class ApiService {
     return null;
   }
 
+  Future<List<BannerModel>> getBanners({String position = 'home'}) async {
+    try {
+      final response = await _dio.get('/home/banners', queryParameters: {'position': position});
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((b) => BannerModel.fromJson(b))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching banners ($position): $e');
+    }
+    return [];
+  }
+
   Future<List<ProductModel>> getProductsByCategory(String slug) async {
     try {
       final response = await _dio.get('/home/products/$slug');
@@ -702,9 +716,12 @@ class ApiService {
     }
   }
 
-  Future<List<ProductModel>> getDiscoveryProducts(String tag) async {
+  Future<List<ProductModel>> getDiscoveryProducts(String tag, {String? serviceType}) async {
     try {
-      final response = await _dio.get('/home/products/discovery', queryParameters: {'tag': tag});
+      final queryParams = <String, dynamic>{'tag': tag};
+      if (serviceType != null) queryParams['service_type'] = serviceType;
+      
+      final response = await _dio.get('/home/products/discovery', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data['success']) {
         return (response.data['data'] as List)
             .map((p) => ProductModel.fromJson(p))
@@ -729,6 +746,20 @@ class ApiService {
       debugPrint('Error fetching store detail: $e');
       return null;
     }
+  }
+
+  Future<List<StoreModel>> getStoresByModule(String module) async {
+    try {
+      final response = await _dio.get('/home/stores', queryParameters: {'module': module});
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((s) => StoreModel.fromJson(s))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching stores for module $module: $e');
+    }
+    return [];
   }
 
   Future<List<ProductModel>> getStoreProductsPublic(int id, {int? categoryId, int? storeCategoryId, int page = 1}) async {

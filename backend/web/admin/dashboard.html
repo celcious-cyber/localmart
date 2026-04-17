@@ -111,12 +111,19 @@
                     <h3>Banner Management</h3>
                     <button class="action-btn" onclick="openBannerModal()">+ Add Banner</button>
                 </div>
+                <div class="guide-box" style="background: rgba(33, 150, 243, 0.1); border: 1px solid var(--primary); padding: 1rem; border-radius: 0.8rem; margin-bottom: 1.5rem;">
+                    <p style="color: var(--primary); font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="material-icons" style="font-size: 1.2rem;">info</i>
+                        <strong>Tips Desain Banner:</strong> 
+                        Gunakan ukuran <strong>1280 x 720 pixel</strong> (Rasio 16:9) atau <strong>1200 x 600 pixel</strong> (Rasio 2:1). 
+                        Pastikan teks utama berada di tengah agar tidak terpotong di berbagai layar HP.
+                    </p>
+                </div>
                 <table>
                     <thead>
                         <tr>
                             <th>Preview</th>
-                            <th>Title</th>
-                            <th>Position</th>
+                            <th>Modul</th>
                             <th>Order</th>
                             <th>Actions</th>
                         </tr>
@@ -281,10 +288,7 @@
             <h3 id="modalTitle">Banner Editor</h3>
             <form id="bannerForm" style="margin-top: 1.5rem;">
                 <input type="hidden" id="bannerId">
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="b_title" required>
-                </div>
+                <input type="hidden" id="b_title" value="Banner Promo">
                 <div class="form-group">
                     <label>Image URL</label>
                     <input type="text" id="b_image_url" placeholder="/uploads/..." required>
@@ -292,11 +296,39 @@
                     <img id="b_preview" class="preview-img" src="">
                 </div>
                 <div class="form-group">
-                    <label>Position</label>
-                    <select id="b_position" style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
-                        <option value="top">Top Highlight</option>
-                        <option value="slider">Bottom Slider</option>
-                    </select>
+                    <label>Target Modul / Halaman</label>
+                    <div id="bannerModuleContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; background: var(--bg); padding: 1.2rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="home" style="width: 16px; height: 16px; accent-color: var(--primary);"> Beranda
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="food" style="width: 16px; height: 16px; accent-color: var(--primary);"> LocalFood
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="umkm" style="width: 16px; height: 16px; accent-color: var(--primary);"> UMKM
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="kost" style="width: 16px; height: 16px; accent-color: var(--primary);"> Kost
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="rental" style="width: 16px; height: 16px; accent-color: var(--primary);"> Rental
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="transport" style="width: 16px; height: 16px; accent-color: var(--primary);"> Transport
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="jasa" style="width: 16px; height: 16px; accent-color: var(--primary);"> Jasa
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="bumi" style="width: 16px; height: 16px; accent-color: var(--primary);"> Hasil Bumi
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="wisata" style="width: 16px; height: 16px; accent-color: var(--primary);"> Wisata
+                        </label>
+                        <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.7rem; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: background 0.2s;">
+                            <input type="checkbox" name="b_pos" value="second" style="width: 16px; height: 16px; accent-color: var(--primary);"> Preloved
+                        </label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Sort Order</label>

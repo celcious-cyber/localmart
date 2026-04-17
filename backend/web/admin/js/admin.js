@@ -201,18 +201,28 @@ if (isAdminPath && !isLoginPage) {
         const data = await handleResponse(await fetch(`${API_URL}/admin/banners`, { headers: getHeaders() }));
         window.allBanners = data;
         const list = document.getElementById('bannerList');
-        list.innerHTML = data.map(b => `
-            <tr>
-                <td><img src="${b.image_url}" class="preview-img" style="width: 60px"></td>
-                <td>${b.title}</td>
-                <td>${b.position}</td>
-                <td>${b.sort_order}</td>
-                <td>
-                    <button class="action-btn edit-btn" onclick="openBannerModalById(${b.id})">Edit</button>
-                    <button class="action-btn delete-btn" onclick="deleteItem('banners', ${b.id})">Del</button>
-                </td>
-            </tr>
-        `).join('');
+        
+        const getPositionBadges = (posString) => {
+            const positions = posString.split(',').filter(p => p.trim() !== '');
+            return positions.map(p => {
+                const isMain = ['home', 'food', 'umkm'].includes(p);
+                return `<span class="badge ${isMain ? 'badge-blue' : 'badge-green'}" style="margin-right: 2px;">${p.toUpperCase()}</span>`;
+            }).join('');
+        };
+
+        if (list) {
+            list.innerHTML = data.map(b => `
+                <tr>
+                    <td><img src="${b.image_url}" class="preview-img" style="width: 60px"></td>
+                    <td>${getPositionBadges(b.position)}</td>
+                    <td>${b.sort_order}</td>
+                    <td>
+                        <button class="action-btn edit-btn" onclick="openBannerModalById(${b.id})">Edit</button>
+                        <button class="action-btn delete-btn" onclick="deleteItem('banners', ${b.id})">Del</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
     }
 
     // --- Categories Manager ---
@@ -433,14 +443,28 @@ if (isAdminPath && !isLoginPage) {
         const modal = document.getElementById('bannerModal');
         document.getElementById('bannerForm').reset();
         document.getElementById('b_preview').src = '';
+        
+        // Reset checkboxes
+        document.querySelectorAll('input[name="b_pos"]').forEach(cb => cb.checked = false);
+
         if (data) {
             document.getElementById('bannerId').value = data.id;
-            document.getElementById('b_title').value = data.title;
+            document.getElementById('b_title').value = data.title || 'Banner Promo';
             document.getElementById('b_image_url').value = data.image_url;
             document.getElementById('b_preview').src = data.image_url;
-            document.getElementById('b_position').value = data.position;
             document.getElementById('b_order').value = data.sort_order;
-        } else { document.getElementById('bannerId').value = ''; }
+
+            // Check appropriate boxes
+            if (data.position) {
+                const activePos = data.position.split(',');
+                document.querySelectorAll('input[name="b_pos"]').forEach(cb => {
+                    if (activePos.includes(cb.value)) cb.checked = true;
+                });
+            }
+        } else { 
+            document.getElementById('bannerId').value = ''; 
+            document.getElementById('b_title').value = 'Banner Promo';
+        }
         modal.style.display = 'flex';
     };
 
@@ -594,13 +618,25 @@ if (isAdminPath && !isLoginPage) {
     // --- Forms Submission ---
     window.initFormListeners = () => {
         const bannerForm = document.getElementById('bannerForm');
-        if (bannerForm) bannerForm.onsubmit = (e) => submitForm(e, 'bannerId', 'banners', {
-            title: document.getElementById('b_title').value,
-            image_url: document.getElementById('b_image_url').value,
-            position: document.getElementById('b_position').value,
-            sort_order: parseInt(document.getElementById('b_order').value),
-            is_active: true
-        });
+        if (bannerForm) bannerForm.onsubmit = (e) => {
+            const selectedPos = Array.from(document.querySelectorAll('input[name="b_pos"]:checked'))
+                .map(cb => cb.value)
+                .join(',');
+            
+            if (!selectedPos) {
+                alert('Pilih setidaknya satu target modul!');
+                e.preventDefault();
+                return;
+            }
+
+            submitForm(e, 'bannerId', 'banners', {
+                title: document.getElementById('b_title').value,
+                image_url: document.getElementById('b_image_url').value,
+                position: selectedPos,
+                sort_order: parseInt(document.getElementById('b_order').value),
+                is_active: true
+            });
+        };
 
         const categoryForm = document.getElementById('categoryForm');
         if (categoryForm) categoryForm.onsubmit = (e) => {

@@ -33,6 +33,7 @@ func SetupRoutes(router *gin.Engine) {
 			home.GET("/discovery", handlers.GetDiscoveryTabs)
 			home.GET("/products/discovery", handlers.GetDiscoveryProducts)
 			home.GET("/search", handlers.GlobalSearch)
+			home.GET("/stores", handlers.GetStoresPublic)
 		}
 
 		// Store Detail Endpoints (Public)

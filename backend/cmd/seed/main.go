@@ -261,13 +261,14 @@ func main() {
 		
 		// Map existing category to new modules
 		cat := stores[i].Category
-		if cat == "Kuliner Lokal" {
+		switch cat {
+		case "Kuliner Lokal":
 			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["food"])
-		} else if cat == "Kerajinan Khas" {
+		case "Kerajinan Khas":
 			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["umkm"])
-		} else if cat == "Hasil Bumi" {
+		case "Hasil Bumi":
 			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["bumi"])
-		} else if cat == "Sewa & Rental" {
+		case "Sewa & Rental":
 			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["rental"])
 		}
 		
@@ -295,9 +296,10 @@ func main() {
 			storeID := storeIDs[rand.Intn(len(storeIDs))]
 			
 			price := 15000.0 + float64(rand.Intn(500))*1000.0
-			if cat.Service == "food" {
+			switch cat.Service {
+			case "food":
 				price = 10000.0 + float64(rand.Intn(40))*1000.0
-			} else if cat.Service == "second" {
+			case "second":
 				price = 50000.0 + float64(rand.Intn(100))*5000.0
 			}
 
@@ -358,17 +360,29 @@ func main() {
 	}
 	db.Create(&helpCenters)
 
-	// 8. Seed Banners
+	// 8. Seed Banners (Modular)
 	banners_seed := []models.Banner{
-		{Title: "Promo Kuliner Sumbawa", ImageURL: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800", Position: "top", SortOrder: 1, IsActive: true},
-		{Title: "Explore Alam Sumbawa", ImageURL: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800", Position: "slider", SortOrder: 1, IsActive: true},
+		// Multi-Module Banner (Home & Food)
+		{Title: "Voucher Weekend", ImageURL: "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&q=80&w=800", Position: "home,food", SortOrder: 0, IsActive: true},
+		
+		// Home Banners
+		{Title: "Promo Member Baru", ImageURL: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=800", Position: "home", SortOrder: 1, IsActive: true},
+		{Title: "Explore Alam Sumbawa", ImageURL: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800", Position: "home", SortOrder: 2, IsActive: true},
+		
+		// Food Banners
+		{Title: "Diskon Kuliner Malam", ImageURL: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=800", Position: "food", SortOrder: 1, IsActive: true},
+		{Title: "Ayam Taliwang Spesial", ImageURL: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800", Position: "food", SortOrder: 2, IsActive: true},
+
+		// UMKM Banners
+		{Title: "Pameran Kerajinan Mantar", ImageURL: "https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop&q=80&w=800", Position: "umkm", SortOrder: 1, IsActive: true},
+		{Title: "Tenun Khas KSB", ImageURL: "https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop&q=80&w=400", Position: "umkm", SortOrder: 2, IsActive: true},
 	}
 	db.Create(&banners_seed)
 
 	// 9. Seed Sections (Modular Discovery 9 Modules)
 	sections_seed := []models.Section{
-		{Key: "quick_actions", Title: "Layanan Kami", SortOrder: 1, IsActive: true},
-		{Key: "banner_top", Title: "Promo Terkini", SortOrder: 2, IsActive: true},
+		{Key: "banner_top", Title: "Promo Terkini", SortOrder: 1, IsActive: true},
+		{Key: "quick_actions", Title: "Layanan Kami", SortOrder: 2, IsActive: true},
 		{Key: "module_food", Title: "Kuliner & Resto", SortOrder: 3, IsActive: true},
 		{Key: "module_kost", Title: "Properti & Penginapan", SortOrder: 4, IsActive: true},
 		{Key: "module_rental", Title: "Rental Kendaraan", SortOrder: 5, IsActive: true},

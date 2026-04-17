@@ -255,6 +255,8 @@ td {
 .badge-jasa { background: #3498db; }
 .badge-rental { background: #f39c12; }
 .badge-wisata { background: #9b59b6; }
+.badge-blue { background: #2196f3; }
+.badge-green { background: #4caf50; }
 
 .action-btn {
     padding: 0.3rem 0.6rem;

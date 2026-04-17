@@ -1,29 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
+import 'widgets/modular_banner_carousel.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_patterns.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/services/api_service.dart';
 import '../../../shared/models/home_data.dart';
 import '../search/screens/search_screen.dart';
+import '../../shared/screens/modular_discovery_screen.dart';
 import '../scan/scan_screen.dart';
 import '../chat/chat_screen.dart';
-import '../localfood/localfood_screen.dart';
 import '../orders/orders_screen.dart';
 import '../profile/profile_screen.dart';
 import '../localsend/localsend_screen.dart';
 import '../bills/bills_screen.dart';
 import '../localpay/localpay_screen.dart';
 import '../profile/screens/favorites_screen.dart';
-import '../kost/kost_screen.dart';
-import '../rental/rental_screen.dart';
-import '../transport/transport_screen.dart';
-import '../service/service_screen.dart';
-import '../tourism/tourism_screen.dart';
-import '../second_hand/second_hand_screen.dart';
-import '../umkm/umkm_screen.dart';
-import '../agri/agri_screen.dart';
 import '../product/screens/product_detail_screen.dart';
 import '../profile/controllers/favorites_controller.dart';
 import './controllers/home_data_controller.dart';
@@ -45,13 +39,12 @@ class _HomeScreenState extends State<HomeScreen>
   int _activeDiscoveryTab = 0;
   late AnimationController _controller;
   late Animation<double> _animation;
-  final PageController _bannerController = PageController();
   final ScrollController _categoryScrollController = ScrollController();
 
   // API State
   final ApiService _api = ApiService();
   final FavoritesController _favController = Get.put(FavoritesController());
-  
+
   // Note: Local discovery states kept for legacy 'discovery' section if needed,
   // but most logic moved to HomeDataController.
   List<ProductModel> _discoveryProducts = [];
@@ -68,10 +61,12 @@ class _HomeScreenState extends State<HomeScreen>
       begin: 0,
       end: 0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-    
+
     // Auto-fetch first discovery tab for legacy section
     _homeController.homeData.listen((data) {
-      if (data != null && data.discoveryTabs.isNotEmpty && _discoveryProducts.isEmpty) {
+      if (data != null &&
+          data.discoveryTabs.isNotEmpty &&
+          _discoveryProducts.isEmpty) {
         _fetchDiscoveryProducts(0);
       }
     });
@@ -80,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _fetchDiscoveryProducts(int index) async {
     final homeData = _homeController.homeData.value;
     if (homeData == null || homeData.discoveryTabs.isEmpty) return;
-    
+
     setState(() {
       _activeDiscoveryTab = index;
       _isDiscoveryLoading = true;
@@ -97,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final products = await _api.getDiscoveryProducts(tag);
-    
+
     if (mounted) {
       setState(() {
         _discoveryProducts = products;
@@ -109,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     _controller.dispose();
-    _bannerController.dispose();
     _categoryScrollController.dispose();
     super.dispose();
   }
@@ -157,7 +151,9 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildHomeBody(BuildContext context) {
     return Obx(() {
       if (_homeController.isLoading.value) {
-        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
       }
 
       return RefreshIndicator(
@@ -185,7 +181,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   List<Widget> _buildDynamicSections() {
     final homeData = _homeController.homeData.value;
-    if (homeData == null) return [const Center(child: Text("Gagal memuat data"))];
+    if (homeData == null) {
+      return [const Center(child: Text("Gagal memuat data"))];
+    }
 
     List<Widget> sections = [const SizedBox(height: 12)];
 
@@ -198,10 +196,10 @@ class _HomeScreenState extends State<HomeScreen>
       switch (section.key) {
         case 'quick_actions':
           sections.add(_buildQuickActionRow());
-          sections.add(const SizedBox(height: 16));
+          // Menghilangkan SizedBox height agar benar-benar rapat dengan seksi di bawahnya
           break;
         case 'banner_top':
-          sections.add(_buildBannerHighlight());
+          sections.add(_buildBannerCarousel());
           sections.add(const SizedBox(height: 20));
           break;
         case 'categories':
@@ -213,8 +211,7 @@ class _HomeScreenState extends State<HomeScreen>
           sections.add(const SizedBox(height: 20));
           break;
         case 'banner_slider':
-          sections.add(_buildBannerSlider());
-          sections.add(const SizedBox(height: 10));
+          // Banner slider sudah dikonsolidasi ke carousel atas
           break;
         case 'discovery':
           sections.add(_buildDiscoveryHeader());
@@ -229,7 +226,9 @@ class _HomeScreenState extends State<HomeScreen>
           if (section.key.startsWith('module_')) {
             final moduleSlug = section.key.replaceFirst('module_', '');
             if (moduleMap.containsKey(moduleSlug)) {
-              sections.add(ModuleDiscoverySection(module: moduleMap[moduleSlug]!));
+              sections.add(
+                ModuleDiscoverySection(module: moduleMap[moduleSlug]!),
+              );
               sections.add(const SizedBox(height: 20));
             }
           }
@@ -249,15 +248,31 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildQuickActionRow() {
     final actions = [
       {'icon': Icons.restaurant, 'label': 'LocalFood', 'screen': 'LocalFood'},
-      {'icon': Icons.delivery_dining, 'label': 'LocalSend', 'screen': 'LocalSend'},
+      {
+        'icon': Icons.delivery_dining,
+        'label': 'LocalSend',
+        'screen': 'LocalSend',
+      },
       {'icon': Icons.receipt_long, 'label': 'Tagihan', 'screen': 'Tagihan'},
-      {'icon': Icons.account_balance_wallet, 'label': 'LocalPay', 'screen': 'LocalPay'},
+      {
+        'icon': Icons.account_balance_wallet,
+        'label': 'LocalPay',
+        'screen': 'LocalPay',
+      },
       {'icon': Icons.home_work, 'label': 'Kost', 'screen': 'Kost'},
       {'icon': Icons.car_rental, 'label': 'Rental', 'screen': 'Rental'},
-      {'icon': Icons.directions_bus, 'label': 'Transport', 'screen': 'Transport'},
+      {
+        'icon': Icons.directions_bus,
+        'label': 'Transport',
+        'screen': 'Transport',
+      },
       {'icon': Icons.handyman_rounded, 'label': 'Jasa', 'screen': 'Jasa'},
       {'icon': Icons.store, 'label': 'UMKM', 'screen': 'UMKM'},
-      {'icon': Icons.agriculture_rounded, 'label': 'Hasil Bumi', 'screen': 'Hasil Bumi'},
+      {
+        'icon': Icons.agriculture_rounded,
+        'label': 'Hasil Bumi',
+        'screen': 'Hasil Bumi',
+      },
       {'icon': Icons.explore_rounded, 'label': 'Wisata', 'screen': 'Wisata'},
       {'icon': Icons.swap_horiz_rounded, 'label': 'Second', 'screen': 'Second'},
     ];
@@ -274,12 +289,18 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
-    return SizedBox(
-      height: 80,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero, // Menghilangkan padding default GridView
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 0, // Menghilangkan jarak antar baris grid
+          crossAxisSpacing: 0,
+          childAspectRatio: 1.25, // Membuat kotak lebih pendek
+        ),
         itemCount: actions.length,
         itemBuilder: (context, index) {
           final action = actions[index];
@@ -288,39 +309,35 @@ class _HomeScreenState extends State<HomeScreen>
               HapticFeedback.lightImpact();
               _navigateToService(action['screen'] as String);
             },
-            child: Container(
-              width: 68,
-              margin: const EdgeInsets.only(right: 4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      action['icon'] as IconData,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    action['label'] as String,
-                    style: GoogleFonts.manrope(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Icon(
+                    action['icon'] as IconData,
+                    color: AppColors.primary,
+                    size: 22,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  action['label'] as String,
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           );
         },
@@ -329,65 +346,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ════════════════════════════════════════════════════════════════
-  // BANNER HIGHLIGHT
+  // BANNER CAROUSEL (Unified)
   // ════════════════════════════════════════════════════════════════
-  Widget _buildBannerHighlight() {
-    final banners = _homeController.homeData.value?.banners ?? [];
-    if (banners.isEmpty) return const SizedBox.shrink();
-
-    // Untuk demo kita ambil banner pertama saja
-    final banner = banners[0];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        height: 80,
-        decoration: BoxDecoration(
-          image: banner.imageUrl.isNotEmpty 
-            ? DecorationImage(
-                image: NetworkImage(_api.getImageUrl(banner.imageUrl)),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.3), BlendMode.darken)
-              ) 
-            : null,
-          gradient: banner.imageUrl.isEmpty 
-            ? const LinearGradient(
-                colors: [AppColors.primary, AppColors.secondary],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ) 
-            : null,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Stack(
-          children: [
-            // Wave pattern
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: CustomPaint(
-                  painter: WavyPatternPainter(
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: Text(
-                banner.title,
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  // ════════════════════════════════════════════════════════════════
+  // BANNER CAROUSEL (Updated to Modular)
+  // ════════════════════════════════════════════════════════════════
+  Widget _buildBannerCarousel() {
+    return const ModularBannerCarousel(module: 'home');
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -411,13 +376,17 @@ class _HomeScreenState extends State<HomeScreen>
             onTap: () {
               HapticFeedback.lightImpact();
               setState(() => _activeCategoryTab = index);
-              
+
               // Scroll-to-center logic
-              _categoryScrollController.animateTo(
-                index * 100.0 - (MediaQuery.of(context).size.width / 2) + 50.0,
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeOutCubic,
-              ).catchError((_) {}); // Ignore if scroll is already at end
+              _categoryScrollController
+                  .animateTo(
+                    index * 100.0 -
+                        (MediaQuery.of(context).size.width / 2) +
+                        50.0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                  )
+                  .catchError((_) {}); // Ignore if scroll is already at end
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -434,13 +403,15 @@ class _HomeScreenState extends State<HomeScreen>
                       : AppColors.outlineVariant,
                   width: 1,
                 ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ] : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
               child: Text(
                 categories[index].name,
@@ -468,10 +439,12 @@ class _HomeScreenState extends State<HomeScreen>
 
     final products = categories[_activeCategoryTab].products;
     if (products.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(20),
-        child: Text("Belum ada produk di kategori ini"),
-      ));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text("Belum ada produk di kategori ini"),
+        ),
+      );
     }
 
     return Padding(
@@ -488,25 +461,24 @@ class _HomeScreenState extends State<HomeScreen>
         itemCount: products.length,
         itemBuilder: (context, index) {
           final product = products[index];
-          return _buildProductCard(
-            product, 
-            'home_recom_${product.id}',
-          );
+          return _buildProductCard(product, 'home_recom_${product.id}');
         },
       ),
     );
   }
-  
-  Widget _buildProductCard(ProductModel product, String heroTag, {double? width}) {
+
+  Widget _buildProductCard(
+    ProductModel product,
+    String heroTag, {
+    double? width,
+  }) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(
-              product: product,
-              heroTag: heroTag,
-            ),
+            builder: (context) =>
+                ProductDetailScreen(product: product, heroTag: heroTag),
           ),
         );
       },
@@ -543,7 +515,10 @@ class _HomeScreenState extends State<HomeScreen>
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
                         ),
                       ),
                     ),
@@ -570,7 +545,9 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                         child: Icon(
-                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          isFav
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
                           color: isFav ? Colors.red : Colors.grey[400],
                           size: 18,
                         ),
@@ -580,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-          // Product Info
+            // Product Info
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -670,8 +647,14 @@ class _HomeScreenState extends State<HomeScreen>
   // DISCOVERY HEADER
   // ════════════════════════════════════════════════════════════════
   Widget _buildDiscoveryHeader() {
-    final activeTabName = _homeController.homeData.value != null && _homeController.homeData.value!.discoveryTabs.isNotEmpty
-        ? _homeController.homeData.value!.discoveryTabs[_activeDiscoveryTab].name
+    final activeTabName =
+        _homeController.homeData.value != null &&
+            _homeController.homeData.value!.discoveryTabs.isNotEmpty
+        ? _homeController
+              .homeData
+              .value!
+              .discoveryTabs[_activeDiscoveryTab]
+              .name
         : 'Discovery';
 
     return Padding(
@@ -706,66 +689,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ════════════════════════════════════════════════════════════════
-  // BANNER SLIDER
-  // ════════════════════════════════════════════════════════════════
-  Widget _buildBannerSlider() {
-    final sliders = _homeController.homeData.value?.bannerSliders ?? [];
-    if (sliders.isEmpty) return const SizedBox.shrink();
-
-    // Gunakan banner pertama slider untuk demo
-    final banner = sliders[0];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        height: 80,
-        decoration: BoxDecoration(
-          image: banner.imageUrl.isNotEmpty 
-            ? DecorationImage(
-                image: NetworkImage(_api.getImageUrl(banner.imageUrl)),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.3), BlendMode.darken)
-              ) 
-            : null,
-          gradient: banner.imageUrl.isEmpty 
-            ? const LinearGradient(
-                colors: [AppColors.primary, AppColors.secondary],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ) 
-            : null,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: CustomPaint(
-                  painter: WavyPatternPainter(
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: Text(
-                banner.title,
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════════
   // DISCOVERY PILLS
   // ════════════════════════════════════════════════════════════════
   Widget _buildDiscoveryPills() {
@@ -793,7 +716,9 @@ class _HomeScreenState extends State<HomeScreen>
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.05),
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
@@ -826,14 +751,18 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final products = _discoveryProducts;
-    
+
     if (products.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[300]),
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 48,
+                color: Colors.grey[300],
+              ),
               const SizedBox(height: 12),
               Text(
                 'Belum ada produk di kategori ini',
@@ -861,7 +790,7 @@ class _HomeScreenState extends State<HomeScreen>
           return Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _buildProductCard(
-              product, 
+              product,
               'home_disc_${product.id}',
               width: 170,
             ),
@@ -906,7 +835,12 @@ class _HomeScreenState extends State<HomeScreen>
     Widget screen;
     switch (label) {
       case 'LocalFood':
-        screen = const LocalFoodScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalFood',
+          moduleCode: 'food',
+          serviceType: 'food',
+          searchPlaceholder: 'Mau makan apa hari ini?',
+        );
         break;
       case 'LocalSend':
         screen = const LocalSendScreen();
@@ -918,36 +852,73 @@ class _HomeScreenState extends State<HomeScreen>
         screen = const LocalPayScreen();
         break;
       case 'Kost':
-        screen = const KostScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalKost',
+          moduleCode: 'kost',
+          serviceType: 'kost',
+          searchPlaceholder: 'Cari kost di area Taliwang...',
+        );
         break;
       case 'Rental':
-        screen = const RentalScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalRental',
+          moduleCode: 'rental',
+          serviceType: 'rental',
+          searchPlaceholder: 'Cari motor atau mobil...',
+        );
         break;
       case 'Transport':
-        screen = const TransportScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalTransport',
+          moduleCode: 'transport',
+          serviceType: 'transport',
+          searchPlaceholder: 'Cari tiket bus atau travel...',
+        );
         break;
       case 'Jasa':
-        screen = const ServiceScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalService',
+          moduleCode: 'jasa',
+          serviceType: 'jasa',
+          searchPlaceholder: 'Cari layanan jasa AC, Las, dll...',
+        );
         break;
       case 'Wisata':
-        screen = const TourismScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalTourism',
+          moduleCode: 'wisata',
+          serviceType: 'wisata',
+          searchPlaceholder: 'Eksplor tempat wisata seru...',
+        );
         break;
       case 'Second':
-        screen = const SecondHandScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalSecond',
+          moduleCode: 'second',
+          serviceType: 'second',
+          searchPlaceholder: 'Cari barang bekas berkualitas...',
+        );
         break;
       case 'UMKM':
-        screen = const UMKMScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalUMKM',
+          moduleCode: 'umkm',
+          serviceType: 'umkm',
+          searchPlaceholder: 'Cari produk khas KSB...',
+        );
         break;
       case 'Hasil Bumi':
-        screen = const AgriScreen();
+        screen = const ModularDiscoveryScreen(
+          title: 'LocalAgri',
+          moduleCode: 'bumi',
+          serviceType: 'bumi',
+          searchPlaceholder: 'Cari beras, madu, hasil tani...',
+        );
         break;
       default:
         return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => screen),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -1072,7 +1043,7 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get minExtent => 100.0;
 
   @override
-  double get maxExtent => 120.0;
+  double get maxExtent => 165.0;
 
   @override
   Widget build(
@@ -1080,89 +1051,302 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(
-      height: maxExtent,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Wave pattern background
-          Positioned.fill(
-            child: CustomPaint(
-              painter: WavyPatternPainter(
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          height: maxExtent,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.85),
+                AppColors.secondary.withValues(alpha: 0.85),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-          // Header content
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  // Search Bar
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const SearchScreen()),
-                        );
-                      },
-                      child: Container(
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.search,
-                              color: Colors.grey[400],
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Cari di localmart',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 13,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+          child: Stack(
+            children: [
+              // Wave pattern background
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: WavyPatternPainter(
+                    color: Colors.white.withValues(alpha: 0.12),
                   ),
-                  const SizedBox(width: 12),
-                  // Action Icons
-                  _buildHeaderIcon(
-                    Icons.favorite_rounded,
+                ),
+              ),
+              
+              // Row 1 (Top): Logo & Action Icons
+              Opacity(
+                opacity: (1.0 - (shrinkOffset / (maxExtent - minExtent) * 2))
+                    .clamp(0.0, 1.0),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 45, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Logo
+                      Image.asset(
+                        'assets/images/logo/localmart.png',
+                        height: 28,
+                        fit: BoxFit.contain,
+                      ),
+                      // Action Icons
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildHeaderIcon(
+                            Icons.favorite_rounded,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FavoritesScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _buildBadge(
+                            count: 2,
+                            child: const ReactiveCartIcon(),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildBadge(
+                            count: 5,
+                            child: _buildHeaderIcon(
+                              Icons.notifications_none_rounded,
+                              onTap: () => _showNotificationPopup(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Row 2 (Bottom): Search Bar
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => FavoritesScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const SearchScreen(),
+                        ),
                       );
                     },
+                    child: Container(
+                      height: 44,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.search,
+                            color: Colors.grey[400],
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Cari di localmart',
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                color: Colors.grey[400],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildHeaderIcon(Icons.qr_code_scanner_rounded),
-                  const SizedBox(width: 8),
-                  const ReactiveCartIcon(),
-                  const SizedBox(width: 8),
-                  _buildHeaderIcon(Icons.mail_outline_rounded),
-                ],
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxHeight: 450),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Notifikasi Terbaru',
+                      style: GoogleFonts.manrope(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // List
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    _buildNotifItem(
+                      icon: Icons.local_offer_rounded,
+                      color: Colors.orange,
+                      title: 'Promo Spesial Maluk!',
+                      desc: 'Diskon 20% untuk semua menu di Lesehan Taliwang. Berlaku s/d hari ini.',
+                      time: '12 Menit yang lalu',
+                    ),
+                    _buildNotifItem(
+                      icon: Icons.delivery_dining_rounded,
+                      color: AppColors.primary,
+                      title: 'Pesanan Diproses',
+                      desc: 'Driver sedang menuju Resto Maluk Beach untuk menjemput pesananmu.',
+                      time: '45 Menit yang lalu',
+                    ),
+                    _buildNotifItem(
+                      icon: Icons.system_update_rounded,
+                      color: Colors.blue,
+                      title: 'Aplikasi Diperbarui (v1.2.5)',
+                      desc: 'Nikmati fitur Auto-Carousel Banner yang baru saja kami rilis!',
+                      time: '2 Jam yang lalu',
+                    ),
+                  ],
+                ),
+              ),
+              // Footer
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Lihat Semua Notifikasi',
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotifItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String desc,
+    required String time,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  time,
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1170,27 +1354,90 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     );
   }
 
+  Widget _buildBadge({required int count, required Widget child}) {
+    if (count == 0) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -2,
+          right: -2,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.redAccent,
+              shape: BoxShape.circle,
+            ),
+            constraints: const BoxConstraints(
+              minWidth: 16,
+              minHeight: 16,
+            ),
+            child: Text(
+              count.toString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeaderIcon(IconData icon, {VoidCallback? onTap}) {
-    return GestureDetector(
+    return BouncyButton(
       onTap: onTap,
       child: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
 
   @override
   bool shouldRebuild(covariant _SearchHeaderDelegate oldDelegate) => false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BOUNCY BUTTON COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+class BouncyButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const BouncyButton({super.key, required this.child, this.onTap});
+
+  @override
+  State<BouncyButton> createState() => _BouncyButtonState();
+}
+
+class _BouncyButtonState extends State<BouncyButton> {
+  double _scale = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _scale = 0.92),
+      onTapUp: (_) => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 1.0),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

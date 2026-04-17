@@ -35,8 +35,8 @@ func GetHomeData(c *gin.Context) {
 	var discoveryTabs []models.DiscoveryTab
 
 	// 1. Fetch Basic Layout Data
-	config.DB.Where("position = ? AND is_active = ?", "top", true).Order("sort_order ASC").Find(&banners)
-	config.DB.Where("position = ? AND is_active = ?", "slider", true).Order("sort_order ASC").Find(&sliders)
+	config.DB.Where("position LIKE ? AND is_active = ?", "%home%", true).Order("sort_order ASC").Find(&banners)
+	config.DB.Where("position LIKE ? AND is_active = ?", "%slider%", true).Order("sort_order ASC").Find(&sliders)
 	config.DB.Where("is_active = ?", true).Order("sort_order ASC").Find(&sections)
 	config.DB.Where("is_active = ?", true).Order("sort_order ASC").Find(&discoveryTabs)
 
@@ -105,10 +105,10 @@ func GetHomeData(c *gin.Context) {
 
 // GetBanners mengembalikan list banner aktif berdasarkan position
 func GetBanners(c *gin.Context) {
-	position := c.DefaultQuery("position", "top")
+	position := c.DefaultQuery("position", "home")
 
 	var banners []models.Banner
-	config.DB.Where("position = ? AND is_active = ?", position, true).
+	config.DB.Where("position LIKE ? AND is_active = ?", "%"+position+"%", true).
 		Order("sort_order ASC").
 		Find(&banners)
 
@@ -121,13 +121,26 @@ func GetBanners(c *gin.Context) {
 // GetCategories mengembalikan list kategori aktif + produknya
 func GetCategories(c *gin.Context) {
 	typeParam := c.Query("type")
-	if typeParam == "" {
-		typeParam = "BARANG"
-	}
+	serviceType := c.Query("service_type")
 
 	var categories []models.Category
-	config.DB.Where("is_active = ? AND type = ?", true, typeParam).
-		Order("sort_order ASC").
+	query := config.DB.Where("is_active = ?", true)
+
+	// Jika ada service_type (modular), utamakan itu
+	// Jika tidak ada service_type, gunakan default/explicit typeParam
+	if serviceType != "" {
+		query = query.Where("service_type = ?", serviceType)
+		if typeParam != "" {
+			query = query.Where("type = ?", typeParam)
+		}
+	} else {
+		if typeParam == "" {
+			typeParam = "BARANG"
+		}
+		query = query.Where("type = ?", typeParam)
+	}
+
+	query.Order("sort_order ASC").
 		Preload("Products.Images").
 		Preload("Products", "is_active = ?", true).
 		Preload("Products.Store").
@@ -184,10 +197,16 @@ func GetDiscoveryTabs(c *gin.Context) {
 // GetDiscoveryProducts - GET /api/v1/products/discovery?tag=panen_hari_ini
 func GetDiscoveryProducts(c *gin.Context) {
 	tag := c.Query("tag")
+	serviceType := c.Query("service_type")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	var products []models.Product
 	query := config.DB.Preload("Images").Preload("Store").Where("is_active = ?", true)
+
+	// Filter berdasarkan serviceType (Module)
+	if serviceType != "" {
+		query = query.Where("service_type = ?", serviceType)
+	}
 
 	// Filter berdasarkan tag
 	switch tag {
@@ -198,8 +217,7 @@ func GetDiscoveryProducts(c *gin.Context) {
 	case "eksplore_ksb":
 		query = query.Where("is_local_gem = ?", true)
 	default:
-		// Jika tag tidak dikenal, ambil produk terbaru secara umum atau kosong
-		// Untuk demo ini, kita biarkan query tanpa filter tag jika tidak ada match
+		// Jika tag tidak dikenal, ambil produk terbaru secara umum
 	}
 
 	// Ambil data dengan limit dan urutan terbaru
@@ -259,6 +277,36 @@ func GlobalSearch(c *gin.Context) {
 		},
 	})
 }
+
+// GetStoresPublic mencari toko berdasarkan modul bisnis (e.g. food, umkm)
+func GetStoresPublic(c *gin.Context) {
+	module := c.Query("module")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	var stores []models.Store
+	query := config.DB.Where("is_active = ?", true)
+
+	if module != "" {
+		query = query.Joins("JOIN store_business_modules sbm ON sbm.store_id = stores.id").
+			Joins("JOIN business_modules bm ON bm.id = sbm.business_module_id").
+			Where("bm.code = ?", module)
+	}
+
+	err := query.Order("rating DESC, review_count DESC").Limit(limit).Find(&stores).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Gagal mengambil data toko",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    stores,
+	})
+}
+
 // GetStoreDetail - GET /api/v1/stores/:id
 func GetStoreDetail(c *gin.Context) {
 	id := c.Param("id")
