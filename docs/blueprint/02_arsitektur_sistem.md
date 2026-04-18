@@ -1,0 +1,37 @@
+# BAB 2: BLUEPRINT ARSITEKTUR SISTEM (The Technical Core)
+
+### 2.1 Paradigma 'The Big Three Decoupling': Strategi Skalabilitas Independen
+Arsitektur LocalMart didasarkan pada filosofi **Decoupling** maksimal, yang memisahkan ekosistem menjadi tiga entitas fisik dan repositori yang berbeda: Backend (Go), Admin Panel (Web), dan Frontend (Mobile). Pendekatan ini bukan sekadar tren teknologi, melainkan keputusan strategis untuk menjamin kelangsungan sistem dalam jangka panjang. Pemisahan ini memungkinkan setiap komponen untuk berkembang dan melakukan skala (*scaling*) secara independen tanpa ketergantungan erat (*tight coupling*) yang sering menjadi penyebab kegagalan sistematis pada arsitektur monolitik.
+
+Dari sisi **Security Isolation**, dekolaborasi ini memberikan lapisan perlindungan yang kritikal. Jika terjadi kegagalan keamanan atau operasional pada salah satu entitas—misalnya Admin Panel mengalami serangan DDoS atau kesalahan konfigurasi yang membuatnya *down*—maka layanan API inti (Backend) dan akses aplikasi mobile pengguna tetap berjalan tanpa gangguan. Hal ini membatasi "radius ledakan" (*blast radius*) dari sebuah masalah teknis, memastikan integritas ekosistem tetap terjaga. Selain itu, pemisahan ini memungkinkan tim keamanan untuk menerapkan kebijakan akses yang berbeda secara granular; misalnya, Admin Panel dapat diletakkan di balik VPN perusahaan atau akses IP terbatas tanpa memengaruhi akses publik aplikasi mobile.
+
+**Resource Efficiency** juga menjadi keuntungan utama. Dengan pemisahan ini, setiap komponen dapat di-deploy pada lingkungan infrastruktur yang paling optimal sesuai karakteristiknya. Backend yang membutuhkan performa komputasi tinggi dapat dialokasikan pada server dengan spek CPU/RAM yang kuat, sementara Admin Panel yang berbasis statis (HTML/JS) dapat disajikan melalui *Content Delivery Network* (CDN) atau layanan hosting statis yang jauh lebih ekonomis dan cepat. Fleksibilitas ini secara drastis menekan biaya operasional (*OPEX*) sekaligus meningkatkan kecepatan respon bagi pengguna akhir di KSB.
+
+### 2.2 Backend Architecture: High-Performance Engine dengan Golang
+Pemilihan **Golang** sebagai basis backend LocalMart didasarkan pada justifikasi teknis mengenai efisiensi eksekusi. Berbeda dengan bahasa skrip atau diinterpretasi (seperti PHP atau Python) yang memiliki *overhead* eksekusi yang besar, Go adalah bahasa kompilasi (*compiled language*) yang menghasilkan biner mandiri tingkat rendah. Hal ini memberikan keunggulan performa yang mendekati bahasa C, namun dengan manajemen memori yang aman melalui *garbage collector* yang sangat efisien.
+
+Salah satu fitur unggulan yang menjadi pilar LocalMart adalah mekanisme **Goroutines**. Backend LocalMart mampu menangani ribuan permintaan simultan hanya dengan menggunakan utas ringan (*lightweight threads*) yang sangat hemat sumber daya. Dipadukan dengan penggunaan **Channels** untuk komunikasi antar-data secara aman, sistem dapat melakukan pemrosesan data secara paralel tanpa risiko *race condition*. Arsitektur ini adalah kunci utama dalam menjaga *Response Time* API LocalMart tetap berada di bawah angka 100ms, bahkan dalam kondisi beban lalu lintas data yang tinggi, memberikan pengalaman pengguna yang sangat responsif.
+
+Untuk menjaga kualitas kode, kami menerapkan paradigma **Clean Architecture** yang membagi tanggung jawab ke dalam lapisan-lapisan yang jelas:
+*   **Entities:** Berisi aturan bisnis inti dan struktur data.
+*   **Use Cases:** Berisi logika bisnis spesifik untuk setiap fitur.
+*   **Handlers/Interfaces:** Berfungsi sebagai gerbang masuk data (API endpoints) dan akses ke database.
+Pemisahan lapisan ini menjamin bahwa LocalMart bersifat *future-proof*. Jika di masa depan sistem perlu mengganti database dari SQLite ke PostgreSQL, atau mengganti kerangka kerja webnya, pengembang hanya perlu mengubah lapisan terluar tanpa menyentuh logika bisnis inti yang krusial.
+
+### 2.3 RESTful API Contract & Data Interchange
+Interaksi antara pengguna dan server diatur melalui **RESTful API Contract** yang ketat menggunakan format JSON (*JavaScript Object Notation*). Standarisasi ini memastikan bahwa setiap data yang dikirim dan diterima memiliki struktur yang konsisten (E.g., penggunaan *wrapper* seragam untuk pesan sukses dan error). Kontrak data ini menjadi "bahasa universal" yang menghubungkan aplikasi mobile dan web admin ke otak backend.
+
+Keamanan dan integritas data di lapisan API diperkuat oleh rangkaian **Middleware** yang bertindak sebagai filter sebelum data menyentuh logika bisnis:
+1.  **Logger Middleware:** Mendokumentasikan setiap aktivitas dan request secara real-time untuk audit dan *debugging*.
+2.  **Recovery Middleware:** Menjamin sistem tetap berjalan meskipun terjadi kesalahan internal (*panic*), mencegah server berhenti secara total.
+3.  **Auth Middleware (JWT):** Melakukan validasi token keamanan secara asinkronus untuk memastikan bahwa hanya pengguna yang sah yang dapat mengakses data sensitif.
+
+### 2.4 Frontend Framework: Flutter & Reactive State Management (GetX)
+Di sisi konsumen, LocalMart menggunakan **Flutter** sebagai kerangka kerja pengembangan aplikasi mobile. Flutter memungkinkan kita memiliki basis kode tunggal (*single codebase*) untuk merilis aplikasi di Android dan iOS sekaligus. Hal ini mereduksi waktu dan biaya pengembangan hingga 50%, serta memastikan konsistensi visual dan fitur di seluruh platform.
+
+Kesuksesan UX LocalMart didukung oleh penggunaan **GetX** sebagai solusi manajemen status reaktif (*Reactive State Management*). Secara teknis, GetX memungkinkan antarmuka aplikasi merespon perubahan data secara instan tanpa perlu memuat ulang seluruh elemen layar (*re-rendering* yang boros daya). Keunggulan krusial GetX lainnya adalah fitur **Dependency Injection** (DI) yang sangat cerdas; GetX hanya akan menahan logika fitur di dalam memori RAM saat fitur tersebut sedang aktif digunakan. Begitu pengguna keluar dari layar tersebut, GetX secara otomatis membersihkan sumber daya dari RAM. Hal ini menjamin aplikasi LocalMart tetap berjalan sangat lancar (60 FPS) bahkan pada perangkat Android *entry-level* yang umumnya memiliki spesifikasi memori terbatas, sebuah kondisi yang umum ditemukan pada profil masyarakat di KSB.
+
+### 2.5 Admin Panel Architecture: Single Page Application (SPA) Mandiri
+Panel administrasi LocalMart dibangun dengan arsitektur **Single Page Application (SPA)** yang murni menggunakan HTML, Vanilla JavaScript, dan CSS tanpa ketergantungan pada mesin *server-side rendering*. Komunikasi dengan server dilakukan sepenuhnya secara asinkronus melalui protokol **AJAX/Fetch API**. Arsitektur ini menjadikan Admin Panel sangat ringan karena peramban (*browser*) hanya perlu memuat aset antarmuka sekali saja, dan selanjutnya hanya bertukar data mentah (JSON) dengan server.
+
+Pemisahan total Admin Panel dari direktori Backend memberikan keuntungan **Security Isolation** tambahan. Karena Admin Panel merupakan entitas yang terpisah, serangan bertipe *Server-Side Template Injection* (SSTI) atau upaya akses langsung ke sistem berkas backend melalui kerentanan antarmuka menjadi mustahil. Selain itu, pemisahan ini mempermudah proses integrasi berkelanjutan (CI/CD), di mana pembaruan pada tampilan Admin dapat dilakukan kapan saja tanpa memerlukan proses kompilasi ulang atau penghentian layanan pada backend inti. LocalMart memastikan bahwa setiap pintu masuk ke sistem memiliki pengamanan ganda melalui segregasi arsitektur yang disiplin.
