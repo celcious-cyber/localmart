@@ -218,12 +218,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       else
                         Row(
                           children: [
-                            Text(
-                              _getProfileName(),
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                            Expanded(
+                              child: Text(
+                                _getProfileName(),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ),
                             if (currentMode == ProfileMode.seller && _user?.store?.status == 'approved') ...[
@@ -239,6 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text(
                           _getProfileSubtitle(),
                           style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                     ],
                   ),

@@ -20,13 +20,13 @@ type UserRegisterRequest struct {
 	FirstName string `json:"first_name" binding:"required"`
 	LastName  string `json:"last_name"`
 	Email     string `json:"email" binding:"required,email"`
-	Phone     string `json:"phone" binding:"required"`
+	Phone     string `json:"phone"`
 	Password  string `json:"password" binding:"required,min=6"`
 }
 
 type UserLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"` // Bisa Email atau Phone
-	Password   string `json:"password" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 // UserRegister - POST /api/v1/auth/register
@@ -37,10 +37,10 @@ func UserRegister(c *gin.Context) {
 		return
 	}
 
-	// Cek apakah email/phone sudah terdaftar
+	// Cek apakah email sudah terdaftar
 	var existingUser models.User
-	if config.DB.Where("email = ? OR phone = ?", req.Email, req.Phone).First(&existingUser).RowsAffected > 0 {
-		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "Email atau Nomor HP sudah terdaftar"})
+	if config.DB.Where("email = ?", req.Email).First(&existingUser).RowsAffected > 0 {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "Email sudah terdaftar"})
 		return
 	}
 
@@ -115,12 +115,12 @@ func UserLogin(c *gin.Context) {
 		return
 	}
 
-	// Login bisa pakai Email atau Nomor HP
+	// Login pakai Email
 	var user models.User
-	log.Printf("[Login] Attempt with identifier: '%s'", req.Identifier)
-	result := config.DB.Where("email = ? OR phone = ?", req.Identifier, req.Identifier).First(&user)
+	log.Printf("[Login] Attempt with email: '%s'", req.Email)
+	result := config.DB.Where("email = ?", req.Email).First(&user)
 	if result.Error != nil {
-		log.Printf("[Login] User not found for: '%s'", req.Identifier)
+		log.Printf("[Login] User not found for: '%s'", req.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Akun tidak ditemukan atau password salah"})
 		return
 	}
@@ -128,8 +128,8 @@ func UserLogin(c *gin.Context) {
 	// Verifikasi Password
 	log.Printf("[Login Debug] Input: %s, Stored Hash: %s", req.Password, user.Password)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		log.Printf("[Login] Password mismatch for: '%s'", req.Identifier)
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Email/HP atau password salah"})
+		log.Printf("[Login] Password mismatch for: '%s'", req.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Email atau password salah"})
 		return
 	}
 

@@ -47,10 +47,10 @@ class ApiService {
 
   // --- AUTH METHODS ---
 
-  Future<Map<String, dynamic>> login(String identifier, String password, {bool rememberMe = true}) async {
+  Future<Map<String, dynamic>> login(String email, String password, {bool rememberMe = true}) async {
     try {
       final response = await _dio.post('/auth/login', data: {
-        'identifier': identifier,
+        'email': email,
         'password': password,
       });
 

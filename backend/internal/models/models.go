@@ -128,7 +128,7 @@ type User struct {
 	FirstName string    `gorm:"size:100;not null" json:"first_name"`
 	LastName  string    `gorm:"size:100" json:"last_name"`
 	Email     string    `gorm:"size:150;uniqueIndex;not null" json:"email"`
-	Phone     string    `gorm:"size:20;uniqueIndex;not null" json:"phone"`
+	Phone     string    `gorm:"size:20;uniqueIndex" json:"phone"`
 	Password  string    `gorm:"size:255;not null" json:"-"`
 	AvatarURL string    `gorm:"size:500" json:"avatar_url"`
 	Gender    string    `gorm:"size:10" json:"gender"`     // "Laki-laki" atau "Perempuan"
