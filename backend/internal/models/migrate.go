@@ -30,6 +30,8 @@ func Migrate(db *gorm.DB) {
 		&Conversation{},
 		&Message{},
 		&HelpCenter{},
+		&ModuleSpecification{},
+		&Voucher{},
 	)
 	if err != nil {
 		log.Fatal("Gagal auto-migrate database:", err)

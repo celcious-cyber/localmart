@@ -13,7 +13,7 @@ import 'package:localmart_frontend/main.dart';
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const LocalMartApp());
+    await tester.pumpWidget(const LocalMartApp(showOnboarding: true));
 
     // Verify that our app displays the home screen.
     expect(find.text('Produka Unggulan UMKM'), findsOneWidget);

@@ -45,6 +45,7 @@ func SetupRoutes(router *gin.Engine) {
 		}
 
 		v1.GET("/store/constants", handlers.GetStoreConstants)
+		v1.GET("/modules/:code/specifications", handlers.GetModuleSpecifications)
 
 		// Product Details & Reviews (Public)
 		v1.GET("/products", handlers.GetProducts)
@@ -178,6 +179,12 @@ func SetupRoutes(router *gin.Engine) {
 
 			// Upload
 			admin.POST("/upload", handlers.AdminUploadImage)
+
+			// Module Specifications
+			admin.GET("/module-specifications", handlers.ListModuleSpecifications)
+			admin.POST("/module-specifications", handlers.CreateModuleSpecification)
+			admin.PUT("/module-specifications/:id", handlers.UpdateModuleSpecification)
+			admin.DELETE("/module-specifications/:id", handlers.DeleteModuleSpecification)
 		}
 	}
 }

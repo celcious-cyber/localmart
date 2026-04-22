@@ -195,6 +195,7 @@ if (isAdminPath && !isLoginPage) {
         if (sectionId === 'drivers') await loadDrivers();
         if (sectionId === 'sections') await loadHomeSections();
         if (sectionId === 'vouchers') await loadVouchers();
+        if (sectionId === 'moduleSpecs') await loadModuleSpecs();
     }
 
     // --- Banners Manager ---
@@ -217,7 +218,7 @@ if (isAdminPath && !isLoginPage) {
                     <td><img src="${b.image_url}" class="preview-img" style="width: 60px"></td>
                     <td>${getPositionBadges(b.position)}</td>
                     <td>${b.sort_order}</td>
-                    <td>
+                    <td style="display: flex; gap: 5px;">
                         <button class="action-btn edit-btn" onclick="openBannerModalById(${b.id})">Edit</button>
                         <button class="action-btn delete-btn" onclick="deleteItem('banners', ${b.id})">Del</button>
                     </td>
@@ -277,7 +278,7 @@ if (isAdminPath && !isLoginPage) {
                     <td>${c.slug}</td>
                     <td><span class="badge badge-${safeType.toLowerCase()}">${safeType}</span></td>
                     <td>${c.sort_order}</td>
-                    <td>
+                    <td style="display: flex; gap: 5px;">
                         <button class="action-btn edit-btn" onclick="openCategoryModalById(${c.id})">Edit</button>
                         <button class="action-btn delete-btn" onclick="deleteItem('categories', ${c.id})">Del</button>
                     </td>
@@ -297,7 +298,7 @@ if (isAdminPath && !isLoginPage) {
                 <td>${p.name}</td>
                 <td>${p.category?.name || 'N/A'}</td>
                 <td>${formatCurrency(p.price)}</td>
-                <td>
+                <td style="display: flex; gap: 5px;">
                     <button class="action-btn edit-btn" onclick="openProductModalById(${p.id})">Edit</button>
                     <button class="action-btn delete-btn" onclick="deleteItem('products', ${p.id})">Del</button>
                 </td>
@@ -402,7 +403,7 @@ if (isAdminPath && !isLoginPage) {
                 <td>${v.type === 'PERCENT' ? v.value + '%' : 'Rp ' + v.value.toLocaleString()} ${v.max_discount > 0 ? '(Max Rp ' + v.max_discount.toLocaleString() + ')' : ''}</td>
                 <td>Rp ${v.min_order.toLocaleString()}</td>
                 <td><span style="color: ${v.is_active ? '#4CAF50' : '#f44336'}; font-weight: bold">${v.is_active ? 'ACTIVE' : 'INACTIVE'}</span></td>
-                <td>
+                <td style="display: flex; gap: 5px;">
                     <button class="action-btn edit-btn" onclick="openVoucherModalById(${v.id})">Edit</button>
                     <button class="action-btn delete-btn" onclick="deleteItem('vouchers', ${v.id})">Del</button>
                 </td>
@@ -510,8 +511,18 @@ if (isAdminPath && !isLoginPage) {
             
             // Load and set categories for this service type
             await handleModuleChange(data.category_id);
+
+            // Load specs with existing metadata
+            let metadata = {};
+            try {
+                metadata = typeof data.metadata === 'string' ? JSON.parse(data.metadata) : (data.metadata || {});
+            } catch(e) { console.warn("Invalid metadata JSON", data.metadata); }
+            
+            await fetchProductSpecs(serviceType, metadata);
+
         } else { 
             document.getElementById('productId').value = ''; 
+            document.getElementById('dynamicProductFields').style.display = 'none';
         }
         modal.style.display = 'flex';
     };
@@ -579,10 +590,64 @@ if (isAdminPath && !isLoginPage) {
                 : '<option value="">Tidak ada kategori untuk modul ini</option>';
             
             catSelect.disabled = categories.length === 0;
+            
+            // ALSO: Fetch and render dynamic specs for this module
+            await fetchProductSpecs(serviceType);
+            
         } catch (err) {
             catSelect.innerHTML = '<option value="">Gagal memuat data</option>';
         } finally {
             if (loader) loader.style.display = 'none';
+        }
+    };
+
+    window.fetchProductSpecs = async (moduleCode, existingMetadata = null) => {
+        const container = document.getElementById('dynamicFieldsContainer');
+        const section = document.getElementById('dynamicProductFields');
+        
+        try {
+            // Use the public endpoint to get specs for a specific module
+            const url = `${API_URL}/modules/${moduleCode}/specifications`;
+            const specs = await handleResponse(await fetch(url));
+            
+            if (!specs || specs.length === 0) {
+                section.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            section.style.display = 'block';
+            container.innerHTML = specs.map(s => {
+                const value = existingMetadata ? (existingMetadata[s.key] || '') : '';
+                let inputHtml = '';
+
+                if (s.input_type === 'boolean') {
+                    inputHtml = `<input type="checkbox" id="meta_${s.key}" class="spec-input" ${value === true || value === 'true' ? 'checked' : ''} style="width: auto;">`;
+                } else if (s.input_type === 'select') {
+                    const options = (s.options || '').split(',').map(o => o.trim());
+                    inputHtml = `
+                        <select id="meta_${s.key}" class="spec-input">
+                            <option value="">-- Pilih --</option>
+                            ${options.map(o => `<option value="${o}" ${value == o ? 'selected' : ''}>${o}</option>`).join('')}
+                        </select>
+                    `;
+                } else if (s.input_type === 'number') {
+                    inputHtml = `<input type="number" id="meta_${s.key}" class="spec-input" value="${value}" placeholder="${s.label}">`;
+                } else {
+                    inputHtml = `<input type="text" id="meta_${s.key}" class="spec-input" value="${value}" placeholder="${s.label}">`;
+                }
+
+                return `
+                    <div class="form-group" style="margin-bottom: 0.8rem;">
+                        <label style="font-size: 0.8rem; color: #aaa; margin-bottom: 0.3rem;">${s.label} ${s.is_required ? '<span style="color:red">*</span>' : ''}</label>
+                        ${inputHtml}
+                    </div>
+                `;
+            }).join('');
+
+        } catch (err) {
+            console.error('Failed to fetch specs:', err);
+            section.style.display = 'none';
         }
     };
 
@@ -658,15 +723,29 @@ if (isAdminPath && !isLoginPage) {
         };
 
         const productForm = document.getElementById('productForm');
-        if (productForm) productForm.onsubmit = (e) => submitForm(e, 'productId', 'products', {
-            name: document.getElementById('p_name').value,
-            category_id: parseInt(document.getElementById('p_cat_id').value),
-            service_type: document.getElementById('p_service_type').value,
-            price: parseFloat(document.getElementById('p_price').value),
-            image_url: document.getElementById('p_image_url').value,
-            description: document.getElementById('p_desc').value,
-            is_active: true
-        });
+        if (productForm) productForm.onsubmit = (e) => {
+            // Collect metadata from dynamic fields
+            const metadata = {};
+            document.querySelectorAll('.spec-input').forEach(input => {
+                const key = input.id.replace('meta_', '');
+                if (input.type === 'checkbox') {
+                    metadata[key] = input.checked;
+                } else {
+                    metadata[key] = input.value;
+                }
+            });
+
+            submitForm(e, 'productId', 'products', {
+                name: document.getElementById('p_name').value,
+                category_id: parseInt(document.getElementById('p_cat_id').value),
+                service_type: document.getElementById('p_service_type').value,
+                price: parseFloat(document.getElementById('p_price').value),
+                image_url: document.getElementById('p_image_url').value,
+                description: document.getElementById('p_desc').value,
+                metadata: JSON.stringify(metadata),
+                is_active: true
+            });
+        };
 
         const voucherForm = document.getElementById('voucherForm');
         if (voucherForm) voucherForm.onsubmit = (e) => submitForm(e, 'voucherId', 'vouchers', {
@@ -677,6 +756,9 @@ if (isAdminPath && !isLoginPage) {
             max_discount: parseFloat(document.getElementById('v_max_discount').value),
             is_active: true
         });
+
+        const specForm = document.getElementById('specForm');
+        if (specForm) specForm.onsubmit = saveSpec;
 
         const storeForm = document.getElementById('storeForm');
         if (storeForm) storeForm.onsubmit = async (e) => {
@@ -708,13 +790,97 @@ if (isAdminPath && !isLoginPage) {
                 alert('Success: Data toko berhasil diperbarui!');
                 location.reload();
             } catch (err) {
-                alert('Error: ' + err.message);
+                alert('Error saving store: ' + err.message);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerText = 'Save Store Metadata';
             }
         };
     };
+
+// --- Module Specs Manager ---
+async function loadModuleSpecs() {
+    try {
+        const specs = await handleResponse(await fetch(`${API_URL}/admin/module-specifications`, { headers: getHeaders() }));
+        const specList = document.getElementById('specList');
+        specList.innerHTML = specs.map(s => `
+            <tr>
+                <td><span class="badge" style="background: var(--primary);">${s.module_code.toUpperCase()}</span></td>
+                <td><strong>${s.label}</strong></td>
+                <td><code>${s.key}</code></td>
+                <td>${s.input_type}</td>
+                <td>${s.is_required ? '<i class="material-icons" style="color: #4CAF50; font-size: 1.2rem;">check_circle</i>' : '-'}</td>
+                <td style="display: flex; gap: 8px;">
+                    <button class="icon-btn" onclick="openSpecModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                        <i class="material-icons">edit</i>
+                    </button>
+                    <button class="icon-btn delete" onclick="deleteSpec('${s.id}')">
+                        <i class="material-icons">delete</i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Failed to load specs:', err);
+    }
+}
+
+window.openSpecModal = (spec = null) => {
+    const modal = document.getElementById('specModal');
+    const form = document.getElementById('specForm');
+    
+    form.reset();
+    document.getElementById('specId').value = spec ? spec.id : '';
+    
+    if (spec) {
+        document.getElementById('s_module_code').value = spec.module_code;
+        document.getElementById('s_label').value = spec.label;
+        document.getElementById('s_key').value = spec.key;
+        document.getElementById('s_input_type').value = spec.input_type;
+        document.getElementById('s_options').value = spec.options || '';
+        document.getElementById('s_is_required').checked = spec.is_required;
+    }
+    
+    modal.style.display = 'flex';
+};
+
+window.deleteSpec = async (id) => {
+    if (!confirm('Hapus spesifikasi ini? Penjual tidak akan bisa lagi mengisi field ini.')) return;
+    try {
+        await handleResponse(await fetch(`${API_URL}/admin/module-specifications/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        }));
+        loadModuleSpecs();
+    } catch (err) {
+        alert('Error deleting spec: ' + err.message);
+    }
+};
+
+async function saveSpec(e) {
+    e.preventDefault();
+    const id = document.getElementById('specId').value;
+    const data = {
+        module_code: document.getElementById('s_module_code').value,
+        label: document.getElementById('s_label').value,
+        key: document.getElementById('s_key').value,
+        input_type: document.getElementById('s_input_type').value,
+        options: document.getElementById('s_options').value,
+        is_required: document.getElementById('s_is_required').checked
+    };
+
+    try {
+        await handleResponse(await fetch(`${API_URL}/admin/module-specifications${id ? '/' + id : ''}`, {
+            method: id ? 'PUT' : 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        }));
+        closeModals();
+        loadModuleSpecs();
+    } catch (err) {
+        alert('Error saving specification: ' + err.message);
+    }
+}
 
     async function submitForm(e, idField, type, payload) {
         e.preventDefault();
@@ -733,7 +899,7 @@ if (isAdminPath && !isLoginPage) {
 }
 
 // Global Help Functions (called from HTML)
-async function deleteItem(type, id) {
+window.deleteItem = async (type, id) => {
     if (!confirm('Yakin ingin menghapus item ini?')) return;
     try {
         await handleResponse(await fetch(`${API_URL}/admin/${type}/${id}`, { 
@@ -742,9 +908,9 @@ async function deleteItem(type, id) {
         }));
         location.reload();
     } catch (err) { alert(err.message); }
-}
+};
 
-async function toggleSection(id, isActive) {
+window.toggleSection = async (id, isActive) => {
     try {
         const sections = await handleResponse(await fetch(`${API_URL}/admin/sections`, { headers: getHeaders() }));
         const section = sections.find(s => s.id === id);
@@ -756,9 +922,9 @@ async function toggleSection(id, isActive) {
             body: JSON.stringify(section)
         }));
     } catch (err) { alert(err.message); }
-}
+};
 
-async function updateMitraStatus(type, id, newStatus) {
+window.updateMitraStatus = async (type, id, newStatus) => {
     const actionText = newStatus === 'approved' ? 'menyetujui' : 'menolak';
     if (!confirm(`Yakin ingin ${actionText} pendaftaran ini?`)) return;
 
@@ -771,7 +937,7 @@ async function updateMitraStatus(type, id, newStatus) {
         alert('Status berhasil diperbarui!');
         location.reload();
     } catch (err) { alert(err.message); }
-}
+};
 
 // Image Upload Helper
 async function uploadImage(fileInputId, previewId, hiddenInputId) {

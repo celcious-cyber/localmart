@@ -193,7 +193,7 @@ func UploadImage(c *gin.Context) {
 
 // CreateStoreProduct - POST /api/v1/user/store/products (Multipart)
 func CreateStoreProduct(c *gin.Context) {
-	c.Request.ParseMultipartForm(8 << 20) // 8MB limit
+	c.Request.ParseMultipartForm(16 << 20) // 16MB limit
 	userID, _ := c.Get("user_id")
 	uid := userID.(uint)
 
@@ -221,13 +221,15 @@ func CreateStoreProduct(c *gin.Context) {
 	width, _ := strconv.Atoi(c.PostForm("width"))
 	height, _ := strconv.Atoi(c.PostForm("height"))
 	
-	// Multi-Etalase parsing
-	categoryIDsRaw := form.Value["store_category_ids[]"]
 	var storeCategories []models.StoreCategory
-	for _, idStr := range categoryIDsRaw {
-		id, _ := strconv.Atoi(idStr)
-		if id > 0 {
-			storeCategories = append(storeCategories, models.StoreCategory{ID: uint(id)})
+	if form != nil {
+		if categoryIDsRaw := form.Value["store_category_ids[]"]; len(categoryIDsRaw) > 0 {
+			for _, idStr := range categoryIDsRaw {
+				id, _ := strconv.Atoi(idStr)
+				if id > 0 {
+					storeCategories = append(storeCategories, models.StoreCategory{ID: uint(id)})
+				}
+			}
 		}
 	}
 
@@ -305,6 +307,12 @@ func CreateStoreProduct(c *gin.Context) {
 		}
 
 		// Handle Uploaded Images
+		if len(files) > 0 {
+			if _, err := os.Stat("uploads"); os.IsNotExist(err) {
+				os.Mkdir("uploads", 0755)
+			}
+		}
+
 		for i, file := range files {
 			ext := filepath.Ext(file.Filename)
 			if ext == "" { ext = ".jpg" }
@@ -339,7 +347,7 @@ func CreateStoreProduct(c *gin.Context) {
 
 // UpdateStoreProduct - PUT /api/v1/user/store/products/:id (Multipart)
 func UpdateStoreProduct(c *gin.Context) {
-	c.Request.ParseMultipartForm(8 << 20) // 8MB limit
+	c.Request.ParseMultipartForm(16 << 20) // 16MB limit
 	userID, _ := c.Get("user_id")
 	uid := userID.(uint)
 	productID := c.Param("id")
@@ -453,6 +461,11 @@ func UpdateStoreProduct(c *gin.Context) {
 		
 		// New Image Uploads
 		files := form.File["images[]"]
+		if len(files) > 0 {
+			if _, err := os.Stat("uploads"); os.IsNotExist(err) {
+				os.Mkdir("uploads", 0755)
+			}
+		}
 		for i, file := range files {
 			filename := fmt.Sprintf("upd_%d_%d_%d%s", product.ID, i, time.Now().Unix(), filepath.Ext(file.Filename))
 			savePath := filepath.Join("uploads", filename)
@@ -616,7 +629,7 @@ func GetStoreDashboard(c *gin.Context) {
 	uid := userID.(uint)
 
 	var store models.Store
-	if err := config.DB.Where("user_id = ?", uid).First(&store).Error; err != nil {
+	if err := config.DB.Preload("BusinessModules").Where("user_id = ?", uid).First(&store).Error; err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "Akses ditolak"})
 		return
 	}

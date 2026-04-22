@@ -5,6 +5,7 @@ import '../../shared/models/home_data.dart';
 import '../../shared/models/user_model.dart';
 import '../../shared/models/store_models.dart';
 import '../../shared/models/review_model.dart';
+import '../../shared/models/module_spec_model.dart';
 import '../../features/auth/widgets/auth_utils.dart';
 
 class ApiService {
@@ -319,6 +320,20 @@ class ApiService {
     return [];
   }
 
+  Future<List<ModuleSpecModel>> getModuleSpecifications(String moduleCode) async {
+    try {
+      final response = await _dio.get('/modules/$moduleCode/specifications');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return (response.data['data'] as List)
+            .map((m) => ModuleSpecModel.fromJson(m))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching module specifications: $e');
+    }
+    return [];
+  }
+
   Future<Map<String, dynamic>> registerDriver({
     required String vehicleType,
     required String plateNumber,
@@ -381,7 +396,7 @@ class ApiService {
 
       final response = await _dio.post('/user/store/products', data: formData);
       if (response.statusCode == 201 && response.data['success'] == true) {
-        return {'success': true, 'message': 'Produka berhasil ditambahkan', 'data': response.data['data']};
+        return {'success': true, 'message': 'Produk berhasil ditambahkan', 'data': response.data['data']};
       }
       return {'success': false, 'message': response.data['message'] ?? 'Gagal tambah produk'};
     } catch (e) {

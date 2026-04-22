@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/ksb/localmart/backend/internal/models"
@@ -74,6 +71,7 @@ func main() {
 		&models.Section{},
 		&models.DiscoveryTab{},
 		&models.BusinessModule{},
+		&models.ModuleSpecification{},
 	)
 
 	// 1. Bersihkan data lama (Urutan penting untuk Foregin Key)
@@ -94,6 +92,8 @@ func main() {
 	db.Exec("DELETE FROM sections")
 	db.Exec("DELETE FROM discovery_tabs")
 	db.Exec("DELETE FROM store_business_modules")
+	db.Exec("DELETE FROM drivers")
+	db.Exec("DELETE FROM users")
 	db.Exec("DELETE FROM business_modules")
 
 	// 2. Pre-seed Categories (Ensuring IDs are known)
@@ -171,225 +171,119 @@ func main() {
 		moduleMap[m.Code] = m
 	}
 
-	// 2.6 Seed Admin (NEW)
-	log.Println("[Seeder] Seeding Admin Account...")
-	adminPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
-	db.Create(&models.Admin{
-		Username: "admin",
-		Password: string(adminPassword),
-	})
+	// 2.6 Seed Admin (KEEP EXISTING)
+	log.Println("[Seeder] Ensuring Admin Account...")
+	var existingAdmin models.Admin
+	if err := db.Where("username = ?", "admin").First(&existingAdmin).Error; err != nil {
+		adminPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		db.Create(&models.Admin{
+			Username: "admin",
+			Password: string(adminPassword),
+		})
+	}
 
-	// 3. Seed Users (Demo User & Stores Owner)
+	// 3. Seed 8 Specific Role Accounts
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	
-	demoUser := models.User{
-		FirstName: "Muhammad",
-		LastName:  "Akmal",
-		Email:     "user@mail.com",
-		Phone:     "081234567890",
-		Password:  string(hashedPassword), // WAJIB HASHED
-		AvatarURL: "https://i.pravatar.cc/150?u=akmal",
-	}
-	db.Create(&demoUser)
-
-	celciousUser := models.User{
-		FirstName: "Celcious",
-		LastName:  "Admin",
-		Email:     "celcious@mail.com",
-		Phone:     "08777666555",
-		Password:  string(hashedPassword),
-		AvatarURL: "https://i.pravatar.cc/150?u=celcious",
-	}
-	db.Create(&celciousUser)
-
-	// 4. Seed Stores (10 Stores)
-	stores := []models.Store{
-		{
-			UserID:      celciousUser.ID,
-			Name:        "CELCIOUS STORE",
-			Category:    "Official Merchant",
-			Description: "Toko resmi LocalMart yang menyediakan berbagai kebutuhan gadget dan aksesoris premium.",
-			Address:     "Jl. Sudirman, Taliwang, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-			Level:       "mall",
-			IsVerified:  true,
-		},
-		{
-			UserID:      demoUser.ID,
-			Name:        "Lesehan Taliwang Berkah",
-			Category:    "Kuliner Lokal",
-			Description: "Ayam Taliwang asli dengan bumbu rempah rahasia keluarga sejak 1990.",
-			Address:     "Jl. Raya Taliwang No. 12, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-			Level:       "star",
-			IsVerified:  true,
-		},
-		{
-			UserID:      demoUser.ID + 10,
-			Name:        "Tenun Mantar Jaya",
-			Category:    "Kerajinan Khas",
-			Description: "Pusat kain tenun tradisional Mantar dengan pewarna alami.",
-			Address:     "Desa Mantar, Poto Tano, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-			Level:       "regular",
-		},
-		{
-			UserID:      demoUser.ID + 11,
-			Name:        "Madu Asli KSB",
-			Category:    "Hasil Bumi",
-			Description: "Madu hutan murni dari pegunungan Sumbawa Barat.",
-			Address:     "Kecamatan Jereweh, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-		},
-		{
-			UserID:      demoUser.ID + 12,
-			Name:        "Apotek Maluk Sehat",
-			Category:    "Kesehatan",
-			Description: "Melayani obat-obatan dan konsultasi kesehatan 24 jam.",
-			Address:     "Jl. Pantai Maluk, Maluk, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-		},
-		{
-			UserID:      demoUser.ID + 13,
-			Name:        "Sewa Motor Maluk Beach",
-			Category:    "Sewa & Rental",
-			Description: "Rental motor harian untuk explore pantai-pantai indah di Sekongkang.",
-			Address:     "Dekat Gerbang Maluk Town Site, KSB",
-			ImageURL:    "https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=400",
-			Status:      "approved",
-		},
+	roles := []struct {
+		Name  string
+		Email string
+		Phone string
+	}{
+		{"Mitra Driver", "driver@localmart.com", "081001"},
+		{"Merchant UMKM", "umkm@localmart.com", "081002"},
+		{"Kuliner Lokal", "food@localmart.com", "081003"},
+		{"Rental KSB", "rental@localmart.com", "081004"},
+		{"Penyedia Jasa", "jasa@localmart.com", "081005"},
+		{"Petani Modern", "petani@localmart.com", "081006"},
+		{"Pemandu Wisata", "wisata@localmart.com", "081007"},
+		{"Barang Second", "second@localmart.com", "081008"},
+		{"Properti & Kost", "kost@localmart.com", "081009"},
 	}
 
-	// Assign 'mart' module to all stores by default + specific modules
-	for i := range stores {
-		stores[i].BusinessModules = []models.BusinessModule{martModule}
-		
-		// Map existing category to new modules
-		cat := stores[i].Category
-		switch cat {
-		case "Kuliner Lokal":
-			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["food"])
-		case "Kerajinan Khas":
-			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["umkm"])
-		case "Hasil Bumi":
-			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["bumi"])
-		case "Sewa & Rental":
-			stores[i].BusinessModules = append(stores[i].BusinessModules, moduleMap["rental"])
+	log.Println("[Seeder] Creating specific role accounts...")
+	for _, r := range roles {
+		user := models.User{
+			FirstName: r.Name,
+			LastName:  "(Tester)",
+			Email:     r.Email,
+			Phone:     r.Phone,
+			Password:  string(hashedPassword),
+			Points:    5000,
 		}
+		db.Create(&user)
 		
-		db.Create(&stores[i])
-	}
-	
-	// Simpan ID toko yang valid
-	var storeIDs []uint
-	for _, s := range stores {
-		storeIDs = append(storeIDs, s.ID)
-	}
-	log.Printf("[Seeder] Successfully seeded %d stores.", len(storeIDs))
-
-	// 5. Seed Products (Modular Distribution)
-	log.Println("[Seeder] Generating products for 9 discovery modules...")
-	totalProducts := 0
-
-	for _, cat := range catBase {
-		// Skip non-discovery categories if needed, but for dummy data we fill everything
-		catID := getOrCreateCategory(db, cat.Name, cat.Icon, cat.Type, cat.Service)
-		
-		// Create 3-5 products for each category
-		numProducts := 3 + rand.Intn(3)
-		for i := 1; i <= numProducts; i++ {
-			storeID := storeIDs[rand.Intn(len(storeIDs))]
-			
-			price := 15000.0 + float64(rand.Intn(500))*1000.0
-			switch cat.Service {
-			case "food":
-				price = 10000.0 + float64(rand.Intn(40))*1000.0
-			case "second":
-				price = 50000.0 + float64(rand.Intn(100))*5000.0
-			}
-
-			imgTag := strings.ToLower(cat.Name)
-			if imgTag == "kuliner lokal" || imgTag == "nasi goreng" {
-				imgTag = "food"
-			}
-
-			product := models.Product{
-				StoreID:     storeID,
-				CategoryID:  catID,
-				Name:        fmt.Sprintf("%s %d", cat.Name, i),
-				Price:       price,
-				ImageURL:    fmt.Sprintf("https://images.unsplash.com/featured/?%s", imgTag),
-				Description: fmt.Sprintf("Layanan/Produk unggulan %s terbaik di Sumbawa Barat untuk Anda.", cat.Name),
-				ServiceType: cat.Service,
+		// Create appropriate profiles based on role
+		if r.Email == "driver@localmart.com" {
+			db.Create(&models.Driver{
+				UserID:      user.ID,
+				VehicleType: "Motor",
+				PlateNumber: "EA 1234 XX",
+				Status:      "approved",
 				IsActive:    true,
-				IsFresh:     cat.Service == "food" || cat.Service == "bumi",
-				IsFeatured:  cat.Service == "umkm" || i == 1,
+			})
+		} else {
+			// Create Store for others
+			store := models.Store{
+				UserID:      user.ID,
+				Name:        "Toko " + r.Name,
+				Category:    "Official",
+				Description: "Akun pengujian resmi untuk kategori " + r.Name,
+				Status:      "approved",
+				IsActive:    true,
 			}
-			db.Create(&product)
-			totalProducts++
+			
+			// Map modules
+			var modCode string
+			switch r.Email {
+			case "umkm@localmart.com": modCode = "umkm"
+			case "food@localmart.com": modCode = "food"
+			case "rental@localmart.com": modCode = "rental"
+			case "jasa@localmart.com": modCode = "jasa"
+			case "petani@localmart.com": modCode = "bumi"
+			case "wisata@localmart.com": modCode = "wisata"
+			case "second@localmart.com": modCode = "second"
+			case "kost@localmart.com": modCode = "kost"
+			}
+			
+			if modCode != "" {
+				store.BusinessModules = []models.BusinessModule{moduleMap[modCode], moduleMap["mart"]}
+			}
+			db.Create(&store)
 		}
 	}
-	log.Printf("[Seeder] Successfully seeded %d products.", totalProducts)
 
-	// 6. Seed Conversations & Chat Flow
-	conv := models.Conversation{
-		Participant1ID: demoUser.ID,
-		Participant2ID: celciousUser.ID,
-		LastMessage:    "Ready Kak, silakan diorder.",
-		UpdatedAt:      time.Now().Add(-45 * time.Minute),
-	}
-	db.Create(&conv)
-
-	messages := []models.Message{
-		{
-			ConversationID: conv.ID,
-			SenderID:       demoUser.ID,
-			ReceiverID:     celciousUser.ID,
-			Content:        "Halo, apakah ini bisa dikirim hari ini?",
-			CreatedAt:      time.Now().Add(-60 * time.Minute),
-		},
-		{
-			ConversationID: conv.ID,
-			SenderID:       celciousUser.ID,
-			ReceiverID:     demoUser.ID,
-			Content:        "Tentu Kak, silakan dipesan sebelum jam 4.",
-			CreatedAt:      time.Now().Add(-45 * time.Minute),
-		},
-	}
-	db.Create(&messages)
-
-	// 7. Seed Help Center
-	helpCenters := []models.HelpCenter{
-		{Category: "Panduan", Title: "Cara Pesan Jasa", Content: "Pilih jasa, hubungi penyedia, dan bayar aman di aplikasi.", Icon: "handyman", SortOrder: 1},
-		{Category: "Keamanan", Title: "Transaksi Aman", Content: "LocalMart menjamin dana Anda kembali jika layanan tidak sesuai.", Icon: "security", SortOrder: 2},
-	}
-	db.Create(&helpCenters)
-
-	// 8. Seed Banners (Modular)
-	banners_seed := []models.Banner{
-		// Multi-Module Banner (Home & Food)
-		{Title: "Voucher Weekend", ImageURL: "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&q=80&w=800", Position: "home,food", SortOrder: 0, IsActive: true},
+	// 3.5 Seed Default Specifications for each module
+	log.Println("[Seeder] Seeding default Module Specifications...")
+	specs := []models.ModuleSpecification{
+		// Kost
+		{ModuleCode: "kost", Label: "Luas Kamar", Key: "luas_area", InputType: "text", IsRequired: true, SortOrder: 1},
+		{ModuleCode: "kost", Label: "Fasilitas Kamar", Key: "fasilitas", InputType: "text", IsRequired: false, SortOrder: 2},
+		{ModuleCode: "kost", Label: "Fasum Terdekat", Key: "fasum", InputType: "text", IsRequired: false, SortOrder: 3},
 		
-		// Home Banners
+		// Wisata
+		{ModuleCode: "wisata", Label: "Titik Kumpul", Key: "meeting_point", InputType: "text", IsRequired: true, SortOrder: 1},
+		{ModuleCode: "wisata", Label: "Ada Kedai Makan?", Key: "ada_kedai", InputType: "boolean", IsRequired: false, SortOrder: 2},
+		
+		// Food
+		{ModuleCode: "food", Label: "Estimasi Masak (Menit)", Key: "cook_time", InputType: "number", IsRequired: false, SortOrder: 1},
+		{ModuleCode: "food", Label: "Level Pedas", Key: "spicy_level", InputType: "select", Options: "Tidak Pedas, Sedang, Pedas, Sangat Pedas", IsRequired: false, SortOrder: 2},
+	}
+	for _, s := range specs {
+		db.Create(&s)
+	}
+
+	log.Println("Seeding akun selesai! Melanjutkan ke metadata UI...")
+
+	// 4. Seed Banners (Modular)
+	banners_seed := []models.Banner{
+		{Title: "Voucher Weekend", ImageURL: "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&q=80&w=800", Position: "home,food", SortOrder: 0, IsActive: true},
 		{Title: "Promo Member Baru", ImageURL: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=800", Position: "home", SortOrder: 1, IsActive: true},
 		{Title: "Explore Alam Sumbawa", ImageURL: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800", Position: "home", SortOrder: 2, IsActive: true},
-		
-		// Food Banners
-		{Title: "Diskon Kuliner Malam", ImageURL: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=800", Position: "food", SortOrder: 1, IsActive: true},
-		{Title: "Ayam Taliwang Spesial", ImageURL: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800", Position: "food", SortOrder: 2, IsActive: true},
-
-		// UMKM Banners
-		{Title: "Pameran Kerajinan Mantar", ImageURL: "https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop&q=80&w=800", Position: "umkm", SortOrder: 1, IsActive: true},
-		{Title: "Tenun Khas KSB", ImageURL: "https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop&q=80&w=400", Position: "umkm", SortOrder: 2, IsActive: true},
 	}
 	db.Create(&banners_seed)
 
-	// 9. Seed Sections (Modular Discovery 9 Modules)
+	// 5. Seed Sections (Modular Discovery)
 	sections_seed := []models.Section{
 		{Key: "banner_top", Title: "Promo Terkini", SortOrder: 1, IsActive: true},
 		{Key: "quick_actions", Title: "Layanan Kami", SortOrder: 2, IsActive: true},
@@ -406,7 +300,7 @@ func main() {
 	}
 	db.Create(&sections_seed)
 
-	// 10. Seed Discovery Tabs
+	// 6. Seed Discovery Tabs
 	tabs_seed := []models.DiscoveryTab{
 		{Name: "Panen Hari Ini", SortOrder: 1, IsActive: true},
 		{Name: "UMKM Pilihan", SortOrder: 2, IsActive: true},
@@ -415,5 +309,12 @@ func main() {
 	}
 	db.Create(&tabs_seed)
 
-	log.Println("Seeding selesai! Semua data tersambung dengan benar.")
+	// 7. Seed Help Center
+	helpCenters := []models.HelpCenter{
+		{Category: "Panduan", Title: "Cara Pesan Jasa", Content: "Pilih jasa, hubungi penyedia, dan bayar aman di aplikasi.", Icon: "handyman", SortOrder: 1},
+		{Category: "Keamanan", Title: "Transaksi Aman", Content: "LocalMart menjamin dana Anda kembali jika layanan tidak sesuai.", Icon: "security", SortOrder: 2},
+	}
+	db.Create(&helpCenters)
+
+	log.Println("Seeding metadata UI selesai!")
 }

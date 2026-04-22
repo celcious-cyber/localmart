@@ -55,6 +55,11 @@
                     <i class="material-icons">confirmation_number</i> Vouchers
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="#moduleSpecs" class="nav-link" data-target="moduleSpecs">
+                    <i class="material-icons">fact_check</i> Module Specs
+                </a>
+            </li>
         </ul>
         <div style="position: absolute; bottom: 2rem; width: 100%; left: 0; padding: 0 1rem;">
             <button id="logoutBtn" class="btn-secondary">Logout</button>
@@ -260,23 +265,34 @@
 
         <!-- Vouchers Section -->
         <section id="vouchers" class="cms-section" style="display: none;">
+            ...
+        </section>
+
+        <!-- Module Specs Section -->
+        <section id="moduleSpecs" class="cms-section" style="display: none;">
             <div class="section-card">
                 <div class="section-header">
-                    <h3>Voucher Management</h3>
-                    <button class="action-btn" onclick="openVoucherModal()">+ Add Voucher</button>
+                    <h3>Module Product Specifications</h3>
+                    <button class="action-btn" onclick="openSpecModal()">+ Add Specification</button>
+                </div>
+                <div class="guide-box" style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 1rem; border-radius: 0.8rem; margin-bottom: 1.5rem;">
+                    <p style="color: #2E7D32; font-size: 0.9rem;">
+                        <i class="material-icons" style="font-size: 1.2rem; vertical-align: middle;">info</i>
+                        Atur field tambahan yang harus diisi penjual untuk setiap modul (contoh: Luas Kamar untuk Kost).
+                    </p>
                 </div>
                 <table>
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <th>Type</th>
-                            <th>Value</th>
-                            <th>Min Order</th>
-                            <th>Status</th>
+                            <th>Module</th>
+                            <th>Field Label</th>
+                            <th>Key (Internal)</th>
+                            <th>Input Type</th>
+                            <th>Required</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="voucherList"></tbody>
+                    <tbody id="specList"></tbody>
                 </table>
             </div>
         </section>
@@ -432,6 +448,12 @@
                         <div id="catLoading" class="small-loader" style="display: none;"></div>
                     </div>
                 </div>
+
+                <!-- Dynamic Fields Based on Module -->
+                <div id="dynamicProductFields" style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 0.5rem; display: none;">
+                    <h4 style="margin-bottom: 1rem; font-size: 0.85rem; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">Module Specifications</h4>
+                    <div id="dynamicFieldsContainer"></div>
+                </div>
                 <div class="form-group">
                     <label>Price</label>
                     <input type="number" id="p_price" required>
@@ -510,6 +532,59 @@
 
                 <div class="btn-group">
                     <button type="submit">Save Store Metadata</button>
+                    <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Module Spec Modal -->
+    <div id="specModal" class="modal">
+        <div class="modal-content">
+            <h3>Specification Editor</h3>
+            <form id="specForm" style="margin-top: 1.5rem;">
+                <input type="hidden" id="specId">
+                <div class="form-group">
+                    <label>Target Modul</label>
+                    <select id="s_module_code" required style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <option value="food">LocalFood</option>
+                        <option value="kost">Kost/Penginapan</option>
+                        <option value="rental">Rental</option>
+                        <option value="jasa">Jasa</option>
+                        <option value="umkm">UMKM</option>
+                        <option value="bumi">Hasil Bumi</option>
+                        <option value="wisata">Wisata</option>
+                        <option value="second">Preloved</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Label (Teks yang dilihat user)</label>
+                    <input type="text" id="s_label" placeholder="Contoh: Luas Kamar" required>
+                </div>
+                <div class="form-group">
+                    <label>Key (ID Internal - Tanpa Spasi)</label>
+                    <input type="text" id="s_key" placeholder="Contoh: luas_kamar" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipe Input</label>
+                    <select id="s_input_type" required style="width: 100%; padding: 0.8rem; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 0.5rem;">
+                        <option value="text">Teks Bebas</option>
+                        <option value="number">Angka</option>
+                        <option value="boolean">Ya/Tidak (Switch)</option>
+                        <option value="select">Pilihan (Dropdown)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Opsi (Pisahkan dengan koma, hanya untuk Dropdown)</label>
+                    <input type="text" id="s_options" placeholder="Contoh: AC, Fan, TV">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="s_is_required" style="width: auto;"> Wajib Diisi
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button type="submit">Save Specification</button>
                     <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>
                 </div>
             </form>

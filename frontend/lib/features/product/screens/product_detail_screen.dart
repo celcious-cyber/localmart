@@ -479,20 +479,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             if (p.length > 0) _buildSpecRow('Dimensi', '${p.length}x${p.width}x${p.height} cm'),
           ],
           
-          if (type == 'JASA') ...[
-            if (_metadata['area_layanan'] != null) _buildSpecRow('Area Layanan', _metadata['area_layanan']),
-            if (_metadata['jam_operasional'] != null) _buildSpecRow('Jam Operasional', _metadata['jam_operasional']),
-          ],
+          // Dynamic Metadata Specs
+          ..._metadata.entries.map((entry) {
+            String label = entry.key.replaceAll('_', ' ').capitalizeFirst ?? entry.key;
+            
+            // Custom label mapping for better UI
+            final labelMap = {
+              'cook_time': 'Estimasi Masak',
+              'spicy_level': 'Level Pedas',
+              'luas_area': 'Luas Kamar',
+              'fasilitas': 'Fasilitas',
+              'fasum': 'Fasilitas Umum',
+              'meeting_point': 'Titik Kumpul',
+              'ada_kedai': 'Kedai Makan',
+              'durasi_sewa': 'Durasi Sewa',
+              'uang_jaminan': 'Uang Jaminan',
+              'area_layanan': 'Area Layanan',
+              'jam_operasional': 'Jam Operasional',
+            };
+            
+            if (labelMap.containsKey(entry.key)) {
+              label = labelMap[entry.key]!;
+            }
 
-          if (type == 'RENTAL') ...[
-            if (_metadata['durasi_sewa'] != null) _buildSpecRow('Durasi Sewa', _metadata['durasi_sewa']),
-            if (_metadata['uang_jaminan'] != null) _buildSpecRow('Uang Jaminan', _api.formatCurrency((_metadata['uang_jaminan'] as num).toDouble())),
-          ],
+            String value = entry.value.toString();
+            if (entry.value is bool) {
+              value = (entry.value as bool) ? 'Tersedia' : 'Tidak Ada';
+            } else if (entry.key.contains('price') || entry.key.contains('jaminan') || entry.key.contains('deposit')) {
+              value = _api.formatCurrency((entry.value as num).toDouble());
+            } else if (entry.value is List) {
+              value = (entry.value as List).join(', ');
+            } else if (entry.key == 'cook_time') {
+              value = '$value Menit';
+            }
 
-          if (type == 'WISATA') ...[
-            if (_metadata['meeting_point'] != null) _buildSpecRow('Titik Kumpul', _metadata['meeting_point']),
-            if (_metadata['fasilitas'] != null) _buildSpecRow('Fasilitas', _metadata['fasilitas'] is List ? (_metadata['fasilitas'] as List).join(', ') : _metadata['fasilitas'].toString()),
-          ],
+            return _buildSpecRow(label, value);
+          }),
           
           const SizedBox(height: 24),
           const Divider(),

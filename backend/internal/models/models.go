@@ -152,6 +152,20 @@ type BusinessModule struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ModuleSpecification - dynamic fields per module
+type ModuleSpecification struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	ModuleCode string    `gorm:"size:50;index;not null" json:"module_code"` // food, kost, etc
+	Label      string    `gorm:"size:100;not null" json:"label"`            // "Luas Area"
+	Key        string    `gorm:"size:100;not null" json:"key"`              // "luas_area"
+	InputType  string    `gorm:"size:20;not null;default:'text'" json:"input_type"` // text, number, select, boolean
+	Options    string    `gorm:"type:text" json:"options"`                  // Comma separated options for select
+	IsRequired bool      `gorm:"default:false" json:"is_required"`
+	SortOrder  int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // Store - profil toko UMKM milik user
 type Store struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`

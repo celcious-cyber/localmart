@@ -52,6 +52,7 @@ dependencies:
   cached_network_image: ^3.3.1
   web_socket_channel: ^3.0.3
   curved_navigation_bar: ^1.0.6
+  smooth_page_indicator: ^2.0.1
 
 dev_dependencies:
   flutter_test:

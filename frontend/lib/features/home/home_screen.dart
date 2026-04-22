@@ -15,7 +15,6 @@ import '../chat/chat_screen.dart';
 import '../orders/orders_screen.dart';
 import '../profile/profile_screen.dart';
 import '../localsend/localsend_screen.dart';
-import '../bills/bills_screen.dart';
 import '../localpay/localpay_screen.dart';
 import '../profile/screens/favorites_screen.dart';
 import '../product/screens/product_detail_screen.dart';
@@ -217,7 +216,6 @@ class _HomeScreenState extends State<HomeScreen>
     final actions = [
       {'icon': Icons.restaurant, 'label': 'LocalFood', 'screen': 'LocalFood'},
       {'icon': Icons.delivery_dining, 'label': 'LocalSend', 'screen': 'LocalSend'},
-      {'icon': Icons.receipt_long, 'label': 'Tagihan', 'screen': 'Tagihan'},
       {'icon': Icons.account_balance_wallet, 'label': 'LocalPay', 'screen': 'LocalPay'},
       {'icon': Icons.home_work, 'label': 'Kost', 'screen': 'Kost'},
       {'icon': Icons.car_rental, 'label': 'Rental', 'screen': 'Rental'},
@@ -551,7 +549,6 @@ class _HomeScreenState extends State<HomeScreen>
     switch (label) {
       case 'LocalFood': screen = const ModularDiscoveryScreen(title: 'LocalFood', moduleCode: 'food', serviceType: 'food', searchPlaceholder: 'Mau makan apa?'); break;
       case 'LocalSend': screen = const LocalSendScreen(); break;
-      case 'Tagihan': screen = const BillsScreen(); break;
       case 'LocalPay': screen = const LocalPayScreen(); break;
       case 'Kost': screen = const ModularDiscoveryScreen(title: 'LocalKost', moduleCode: 'kost', serviceType: 'kost', searchPlaceholder: 'Cari kost...'); break;
       case 'Rental': screen = const ModularDiscoveryScreen(title: 'LocalRental', moduleCode: 'rental', serviceType: 'rental', searchPlaceholder: 'Cari motor/mobil...'); break;

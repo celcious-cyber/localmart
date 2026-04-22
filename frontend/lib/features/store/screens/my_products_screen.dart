@@ -70,7 +70,17 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddOptionsSheet,
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddProductScreen(),
+            ),
+          );
+          if (result == true) {
+            _loadProducts();
+          }
+        },
         backgroundColor: Colors.orange,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text('Tambah Produk', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
@@ -206,139 +216,6 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
             child: Text('Hapus', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showAddOptionsSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Pilih Jenis Postingan',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                _buildOptionCard(
-                  'Barang Fisik',
-                  'Hasil bumi, kuliner, kriya, dsb.',
-                  Icons.inventory_2_rounded,
-                  Colors.blue,
-                  () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddProductScreen(initialType: 'BARANG'),
-                      ),
-                    ).then((value) => value == true ? _loadProducts() : null);
-                  },
-                ),
-                const SizedBox(width: 16),
-                _buildOptionCard(
-                  'Layanan & Sewa',
-                  'Jasa ahli, rental, & wisata.',
-                  Icons.handshake_rounded,
-                  Colors.orange,
-                  () {
-                    Navigator.pop(context);
-                    _showServiceTypeSheet();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showServiceTypeSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildServiceItem('Jasa Ahli', 'Jasa panggilan, perbaikan, dsb.', Icons.handyman_rounded, 'JASA'),
-            _buildServiceItem('Sewa & Rental', 'Rental mobil, motor, alat, dsb.', Icons.car_rental_rounded, 'RENTAL'),
-            _buildServiceItem('Wisata Lokal', 'Paket tour, guide, tiket, dsb.', Icons.tour_rounded, 'WISATA'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildServiceItem(String title, String sub, IconData icon, String type) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, color: Colors.orange),
-      ),
-      title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
-      subtitle: Text(sub, style: GoogleFonts.poppins(fontSize: 12)),
-      onTap: () {
-        Navigator.pop(context);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AddProductScreen(initialType: type),
-          ),
-        ).then((value) => value == true ? _loadProducts() : null);
-      },
-    );
-  }
-
-  Widget _buildOptionCard(String title, String sub, IconData icon, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withValues(alpha: 0.1)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 32),
-              const SizedBox(height: 12),
-              Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 4),
-              Text(sub, style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[600]), maxLines: 2),
-            ],
-          ),
-        ),
       ),
     );
   }

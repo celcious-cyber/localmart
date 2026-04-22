@@ -18,6 +18,8 @@ class LocalPayScreen extends StatelessWidget {
               children: [
                 _buildMainBalanceCard(),
                 _buildActionGrid(),
+                _buildSectionHeader('Bayar Tagihan', showAll: false),
+                _buildServiceGrid(),
                 _buildSectionHeader('Transaksi Terakhir'),
                 _buildTransactionHistory(),
                 const SizedBox(height: 100),
@@ -189,14 +191,72 @@ class LocalPayScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildServiceGrid() {
+    final services = [
+      {'label': 'Listrik PLN', 'icon': Icons.bolt, 'color': Colors.amber},
+      {'label': 'PDAM', 'icon': Icons.water_drop, 'color': Colors.blue},
+      {'label': 'Pulsa & Data', 'icon': Icons.phone_android, 'color': Colors.green},
+      {'label': 'Internet', 'icon': Icons.wifi, 'color': Colors.purple},
+      {'label': 'BPJS', 'icon': Icons.health_and_safety, 'color': Colors.red},
+      {'label': 'TV Kabel', 'icon': Icons.tv, 'color': Colors.orange},
+      {'label': 'PBB', 'icon': Icons.home, 'color': Colors.brown},
+      {'label': 'Lainnya', 'icon': Icons.more_horiz, 'color': Colors.grey},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 20,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.8,
+        ),
+        itemCount: services.length,
+        itemBuilder: (context, index) {
+          final s = services[index];
+          return Column(
+            children: [
+              Container(
+                width: 55,
+                height: 55,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (s['color'] as Color).withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(s['icon'] as IconData, color: s['color'] as Color),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                s['label'] as String,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {bool showAll = true}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: GoogleFonts.epilogue(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text('Semua', style: GoogleFonts.manrope(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.bold)),
+          if (showAll)
+            Text('Semua', style: GoogleFonts.manrope(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -246,4 +306,5 @@ class LocalPayScreen extends StatelessWidget {
       },
     );
   }
+
 }
